@@ -1,0 +1,28 @@
+<svg width="88" height="88" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shieldGrad" x1="12" y1="6" x2="76" y2="82" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="30" y1="34" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#DBEAFE" stop-opacity="0.86"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 盾牌主体：安全防护的语义载体 -->
+  <path d="M44 5L12 18.5v24.8C12 63.1 25.6 79.6 44 83c18.4-3.4 32-19.9 32-39.7V18.5L44 5z"
+        fill="url(#shieldGrad)"/>
+
+  <!-- 语法树结构：三节点分支，呼应 AST 检测内核 -->
+  <g stroke="url(#nodeGrad)" stroke-width="2.4" stroke-linecap="round" fill="none" opacity="0.95">
+    <path d="M44 30v9"/>
+    <path d="M44 39c0 6-10 5-10 11"/>
+    <path d="M44 39c0 6 10 5 10 11"/>
+  </g>
+  <circle cx="44" cy="27" r="4.6" fill="url(#nodeGrad)"/>
+  <circle cx="34" cy="53" r="4.2" fill="url(#nodeGrad)"/>
+  <!-- 右侧节点标红：代表被检出的注入变异结构 -->
+  <circle cx="54" cy="53" r="4.2" fill="#FB7185"/>
+  <circle cx="54" cy="53" r="7.6" fill="#FB7185" opacity="0.28"/>
+</svg>
