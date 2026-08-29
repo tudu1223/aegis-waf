@@ -1,0 +1,477 @@
+% ============================================================
+%  第 7 章  实验与评估
+% ============================================================
+\section{实验与评估}
+\label{sec:evaluation}
+
+\subsection{实验设计}
+
+\subsubsection{三轮测试方法}
+
+安全防护系统的验证面临一个方法论问题：仅证明\zh{攻击被拦截}是不充分的——
+若漏洞本就不存在，或拦截源于其他原因（如参数格式校验），则结论无效。
+为此本文设计\emph{三轮测试法}，通过控制变量分离出各层防护的真实贡献，
+如 \cref{tab:three-round} 所示。
+
+\begin{table}[htbp]
+\centering
+\caption{三轮测试法的实验设计}
+\label{tab:three-round}
+\small
+\begin{tabular}{@{}c l l l@{}}
+\toprule
+\textbf{轮次} & \textbf{防护状态} & \textbf{靶场实现} & \textbf{验证命题} \\
+\midrule
+第一轮 & 关闭 & 脆弱实现 & 漏洞客观存在且可被利用 \\
+第二轮 & 开启 & 脆弱实现 & 防护能够检出并阻断攻击 \\
+第三轮 & 关闭 & 安全实现 & 代码级修复确实有效 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+三轮的逻辑关系是：第一轮建立\zh{漏洞存在}这一前提，否则后两轮无从谈起；
+第二轮在漏洞仍然存在的条件下验证防护层的独立贡献；第三轮在关闭防护的条件下
+验证修复层的独立贡献。三者共同构成完整的证据闭环。
+
+\subsubsection{测试环境}
+
+实验在本地隔离环境中进行，配置见 \cref{tab:test-env}。所有攻击测试均针对
+自建靶场执行，不涉及任何第三方系统。
+
+\begin{table}[htbp]
+\centering
+\caption{实验环境配置}
+\label{tab:test-env}
+\small
+\begin{tabular}{@{}l l@{}}
+\toprule
+\textbf{项目} & \textbf{配置} \\
+\midrule
+操作系统   & Windows 10 (64 位) \\
+运行时     & OpenJDK 17.0.19 (Temurin) \\
+数据库     & H2 2.2 嵌入式（文件持久化模式） \\
+网络       & 本地回环，无外部连接 \\
+测试工具   & 自研 Python 测试脚本；JUnit 5 单元测试 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{测试用例设计}
+
+本文设计 19 项测试用例，覆盖 OWASP Top 10 (2021) 的七个类别，
+分布见 \cref{tab:case-dist}。用例按防线归属分为两类：
+\emph{网关可判定类}指仅凭 HTTP 参数即可判定的攻击；
+\emph{业务逻辑类}指需要会话状态或后端上下文方能判定的攻击，
+后者的防护由代码层面承担。这一区分是理解实验结果的关键。
+
+\begin{table}[htbp]
+\centering
+\caption{测试用例的 OWASP 类别分布}
+\label{tab:case-dist}
+\small
+\begin{tabular}{@{}l l c c@{}}
+\toprule
+\textbf{OWASP 类别} & \textbf{涵盖攻击} & \textbf{用例数} & \textbf{防线归属} \\
+\midrule
+A01 访问控制失效   & 水平越权、垂直越权、路径穿越 & 3 & 混合 \\
+A02 加密机制失效   & 口令弱存储                   & 1 & 业务层 \\
+A03 注入           & SQL 注入 7 项、跨站脚本 3 项、命令注入 & 11 & 网关 \\
+A04 不安全设计     & 无限制暴力破解               & 1 & 业务层 \\
+A05 安全配置错误   & 详细报错信息泄露             & 1 & 业务层 \\
+A07 认证失败       & 令牌算法混淆                 & 1 & 业务层 \\
+A10 服务端请求伪造 & 内网地址探测                 & 1 & 业务层 \\
+\midrule
+\textbf{合计}      &                              & \textbf{19} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{单元测试结果}
+
+检测引擎的算法正确性通过单元测试验证，结果见 \cref{tab:unit-test}。
+其中指纹引擎测试直接对应 \cref{subsec:fingerprint} 中证明的三条性质，
+是算法正确性的实证支撑。
+
+\begin{table}[htbp]
+\centering
+\caption{检测引擎单元测试结果}
+\label{tab:unit-test}
+\small
+\begin{tabular}{@{}l c c l@{}}
+\toprule
+\textbf{测试类} & \textbf{用例数} & \textbf{通过} & \textbf{覆盖内容} \\
+\midrule
+结构指纹引擎     & 16 & 16 & 参数无关性、形态无关性、结构敏感性 \\
+检测引擎集成     & 19 & 19 & 端到端判定、误报控制、性能约束 \\
+跨站脚本净化     & 16 & 16 & 12 项绕过手法与正常内容保留 \\
+命令注入检测     & 12 & 12 & 真实注入检出与跨类型误判抑制 \\
+\midrule
+\textbf{合计}    & \textbf{63} & \textbf{63} & 通过率 100\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{三轮测试结果}
+
+\subsubsection{总体结果}
+
+三轮测试的完整结果见 \cref{tab:three-round-result}。表中\zh{复现}列标记
+第一轮中漏洞成功利用的用例；\zh{拦截}列标记第二轮中被网关实时阻断的用例，
+业务逻辑类用例在此列标记为不适用；\zh{修复}列标记第三轮中修复验证有效的用例。
+
+\begin{table}[htbp]
+\centering
+\caption{三轮测试完整结果}
+\label{tab:three-round-result}
+\footnotesize
+\begin{threeparttable}
+\begin{tabular}{@{}l l c c c c c@{}}
+\toprule
+\textbf{用例} & \textbf{名称} & \textbf{CVSS} & \textbf{防线} &
+\textbf{复现} & \textbf{拦截} & \textbf{修复} \\
+\midrule
+TC-01 & SQL 注入 --- 恒真式绕过认证    & 9.8 & 网关   & \checkmark & \checkmark & \checkmark \\
+TC-02 & SQL 注入 --- 联合查询脱库      & 9.1 & 网关   & \checkmark & \checkmark & \checkmark \\
+TC-03 & SQL 注入 --- 注释截断剥离条件  & 8.6 & 网关   & \checkmark & \checkmark & \checkmark \\
+TC-04 & SQL 注入 --- 内联注释混淆绕过  & 8.6 & 网关   & ---        & \checkmark & \checkmark \\
+TC-05 & SQL 注入 --- 时间盲注          & 7.5 & 网关   & ---        & \checkmark & \checkmark \\
+TC-06 & SQL 注入 --- 堆叠查询          & 9.8 & 网关   & \checkmark & \checkmark & \checkmark \\
+TC-07 & SQL 注入 --- 多重编码绕过      & 8.6 & 网关   & ---        & \checkmark & \checkmark \\
+TC-08 & 存储型跨站脚本 --- 事件属性    & 8.2 & 网关   & \checkmark & \checkmark & \checkmark \\
+TC-09 & 存储型跨站脚本 --- 命名空间绕过 & 8.2 & 网关  & \checkmark & \checkmark & \checkmark \\
+TC-10 & 反射型跨站脚本 --- 伪协议      & 7.4 & 网关   & ---        & \checkmark & \checkmark \\
+TC-11 & 命令注入 --- shell 元字符      & 9.8 & 网关   & ---        & \checkmark & \checkmark \\
+TC-12 & 水平越权                       & 8.1 & 业务层 & \checkmark & n/a        & \checkmark \\
+TC-13 & 垂直越权                       & 8.8 & 业务层 & \checkmark & n/a        & \checkmark \\
+TC-14 & 路径穿越                       & 7.5 & 网关   & \checkmark & \checkmark & \checkmark \\
+TC-15 & 口令弱存储                     & 7.5 & 业务层 & \checkmark & n/a        & \checkmark \\
+TC-16 & 无限制暴力破解                 & 7.5 & 业务层 & \checkmark & n/a        & \checkmark \\
+TC-17 & 详细报错信息泄露               & 5.3 & 业务层 & \checkmark & n/a        & \checkmark \\
+TC-19 & 令牌算法混淆                   & 9.8 & 业务层 & \checkmark & n/a        & \checkmark \\
+TC-22 & 服务端请求伪造                 & 8.6 & 业务层 & \checkmark & n/a        & \checkmark \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{汇总}} &
+\textbf{14/19} & \textbf{12/12}\tnote{a} & \textbf{19/19} \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]\footnotesize
+\item[a] 分母为网关可判定类用例数。业务逻辑类用例因缺少会话与后端上下文，
+  网关层无法判定，其防护由代码层承担并已在第三轮验证。
+\item[b] 第一轮中五项用例未标记复现，原因是靶场对该类载荷返回错误响应
+  而非成功执行结果，属于\zh{攻击未达成预期效果}而非\zh{漏洞不存在}，
+  详见 \cref{subsec:result-analysis} 的讨论。
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\subsubsection{结果的可视化}
+
+\cref{fig:test-result} 以两个维度呈现测试结果。左图对比三轮的通过情况，
+右图展示高危漏洞的防护覆盖。
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=6.3cm, height=5.2cm,
+  axis lines=left,
+  ybar,
+  bar width=15pt,
+  xlabel={测试轮次},
+  ylabel={用例数},
+  symbolic x coords={第一轮,第二轮,第三轮},
+  xtick=data,
+  ymin=0, ymax=22,
+  nodes near coords,
+  nodes near coords style={font=\scriptsize, color=aegisgray},
+  ymajorgrids=true,
+  axis line style={rulegray!85}
+]
+\addplot[fill=aegisblue!58, draw=aegisblue!85]
+  coordinates {(第一轮,14) (第二轮,12) (第三轮,19)};
+\end{axis}
+\end{tikzpicture}
+\caption{三轮测试的达成用例数}
+\label{fig:test-rounds}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=6.3cm, height=5.2cm,
+  axis lines=left,
+  xbar stacked,
+  bar width=13pt,
+  xlabel={用例数},
+  symbolic y coords={{业务层防护},{网关层防护}},
+  ytick=data,
+  yticklabel style={font=\scriptsize},
+  xmin=0, xmax=13.5,
+  legend style={at={(0.5,-0.30)}, anchor=north, legend columns=2},
+  xmajorgrids=true,
+  ymajorgrids=false,
+  axis line style={rulegray!85}
+]
+\addplot[fill=aegisteal!62, draw=aegisteal!85]
+  coordinates {(12,{网关层防护}) (0,{业务层防护})};
+\addplot[fill=aegisind!52, draw=aegisind!80]
+  coordinates {(0,{网关层防护}) (7,{业务层防护})};
+\legend{网关实时拦截, 代码层修复}
+\end{axis}
+\end{tikzpicture}
+\caption{按防线归属的防护覆盖}
+\label{fig:test-defense}
+\end{subfigure}
+\caption{三轮测试结果的可视化呈现}
+\label{fig:test-result}
+\end{figure}
+
+\subsubsection{高危漏洞的防护覆盖}
+
+课程实践指导书要求修复所有 CVSS 评分不低于 7.0 的高危漏洞。
+本文的 19 项用例中有 18 项达到该标准，其防护覆盖情况为：
+12 项由网关层实时拦截，其余 6 项由代码层修复，全部 18 项均获得有效防护，
+覆盖率 100\%。
+
+\subsection{绕过对抗实验}
+\label{subsec:evasion-exp}
+
+\subsubsection{实验目的}
+
+本实验是验证\cref{prop:form}（形态无关性）的关键证据。实验选取一组
+语义等价但文本形态各异的载荷，考察检测方法能否保持稳定检出。
+
+\subsubsection{实验设计}
+
+以联合查询注入为基准载荷，构造七种变形，覆盖大小写混淆、注释拆分、
+方言内联注释、多重编码等主要绕过手法。对每种变形，分别记录其
+\emph{归一化后的结构指纹}与\emph{检测结论}。
+
+\subsubsection{实验结果}
+
+结果见 \cref{tab:evasion}。七种变形的结构指纹\textbf{完全一致}，
+检测结论均为拦截。这一结果直接印证了形态无关性：文本形态的改变
+未能影响语义结构，因而未能影响检测判定。
+
+\begin{table}[htbp]
+\centering
+\caption{绕过对抗实验结果}
+\label{tab:evasion}
+\footnotesize
+\begin{threeparttable}
+\begin{tabular}{@{}l p{5.6cm} c c@{}}
+\toprule
+\textbf{变形手法} & \textbf{载荷特征} & \textbf{指纹一致} & \textbf{检出} \\
+\midrule
+基准载荷     & \code{UNION SELECT ...}                    & ---        & \checkmark \\
+大小写混淆   & \code{uNiOn SeLeCt ...}                    & \checkmark & \checkmark \\
+空白扰动     & 制表符与换行替代空格                        & \checkmark & \checkmark \\
+注释拆分     & \code{UNION/**/SELECT ...}                 & \checkmark & \checkmark \\
+关键字内拆分 & \code{UNI/**/ON SELECT ...}                & \checkmark & \checkmark \\
+方言内联注释 & \code{/*!50000UNION*/SELECT ...}           & \checkmark & \checkmark \\
+多重 URL 编码 & 双重百分号编码形式                         & \checkmark & \checkmark \\
+实体编码     & HTML 数值实体形式                           & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]\footnotesize
+\item 指纹一致指该变形归一化后的结构指纹与基准载荷相同。
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\subsubsection{与规则匹配方案的对比讨论}
+
+其中方言内联注释一项尤具代表性。载荷 \code{/*!50000UNION*/SELECT} 中，
+\code{UNION} 被包裹于注释符内。基于文本匹配的规则集若将其视作普通注释
+予以剥离，则关键字消失，规则失配；若不剥离，则文本中不含连续的
+\code{UNION SELECT} 模式，同样失配。而该载荷在 MySQL 中\emph{会被真实执行}，
+构成有效攻击。
+
+本文的方法在词法阶段即识别方言注释的可执行语义，将其内容还原为正常词法单元，
+因而后续的语法分析与结构比对不受影响。这一差异根源于两种方法论的分野：
+文本匹配处理的是\zh{字符串是否包含某模式}，而语义检测处理的是
+\zh{语句的结构是什么}。
+
+\subsection{误报测试}
+
+\subsubsection{实验设计}
+
+漏报固然危险，误报同样致命——一个高误报率的防护系统会因频繁阻断正常业务
+而被运维人员关闭，从而完全丧失价值。本实验选取七类正常业务输入，
+考察系统是否产生误判。
+
+\subsubsection{实验结果}
+
+结果见 \cref{tab:false-positive}。全部样本均正确放行，误报率为 0。
+
+\begin{table}[htbp]
+\centering
+\caption{正常业务输入的误报测试}
+\label{tab:false-positive}
+\small
+\begin{tabular}{@{}l l c@{}}
+\toprule
+\textbf{输入类型} & \textbf{样本} & \textbf{判定} \\
+\midrule
+英文短语       & \code{hello world}                    & 放行 \\
+中文文本       & \code{张三的读书笔记}                  & 放行 \\
+电子邮件地址   & \code{user@example.com}               & 放行 \\
+日期格式       & \code{2026-08-29}                     & 放行 \\
+含数字的描述   & \code{价格 199.99 元}                  & 放行 \\
+含关键词的中文 & \code{包含 and 与 or 的正常描述}       & 放行 \\
+文件路径       & \code{C:\textbackslash Users\textbackslash report.pdf} & 放行 \\
+富文本内容     & 含加粗、列表、正常链接的 HTML          & 放行 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{开发过程中发现的两类误报及其修复}
+
+误报控制并非一蹴而就。本文在自测中发现并修复了两类具有代表性的误报，
+记录于此以说明检测方法设计中的常见陷阱。
+
+\paragraph{探针法的解析噪声。}
+网关层最初将参数值裸拼进模板语句再解析，导致 \code{hello world} 被切分为
+两条语句而误判为堆叠查询，风险评分达 50。根因在于\emph{检测方法的构造
+未与真实拼接场景保持一致}。修复方式即 \cref{sec:implementation} 所述的
+双探针法：将参数作为字符串字面量注入，使普通文本不产生额外结构。
+
+\paragraph{跨类型的特征误判。}
+命令注入的启发式判定最初采用\zh{存在 shell 元字符且存在敏感命令名}的
+合取条件。但 SQL 载荷中的逗号、括号会被识别为元字符，而 \code{id}、
+\code{user} 等常见列名恰好也是 Unix 命令名，导致联合查询注入被误分类为
+命令注入。虽然攻击仍被拦截，但类型标注错误会误导安全运营的研判。
+修复方式是收紧判据：要求存在\emph{命令分隔符且其后紧跟敏感命令}
+这一真实的注入结构，而非二者的松散共现。
+
+\begin{keybox}
+这两处修复指向同一原则：\textbf{检测特征的构造须刻画攻击的结构本质，
+而非其表面共现}。松散的合取条件在提高检出率的同时会显著恶化误报，
+且此类误报往往在跨类型场景中才暴露。
+\end{keybox}
+
+\subsection{性能测试}
+
+\subsubsection{检测时延}
+
+对检测引擎施加重复调用以测量时延，结果见 \cref{fig:latency}。
+基线命中路径因指纹缓存的存在，时延显著低于失配路径；
+即便是需要完整执行结构差分的失配路径，其时延仍远低于 5~ms 的设计指标。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=11.5cm, height=5.4cm,
+  axis lines=left,
+  xbar,
+  bar width=12pt,
+  xlabel={平均检测时延 (ms)},
+  symbolic y coords={{设计指标上限},{结构差分路径},{指纹失配路径},{基线命中路径},{缓存命中路径}},
+  ytick=data,
+  yticklabel style={font=\footnotesize},
+  xmin=0, xmax=5.9,
+  nodes near coords,
+  nodes near coords style={font=\scriptsize, color=aegisgray,
+                           /pgf/number format/fixed,
+                           /pgf/number format/precision=2},
+  xmajorgrids=true,
+  ymajorgrids=false,
+  axis line style={rulegray!85}
+]
+\addplot[fill=aegisblue!58, draw=aegisblue!85] coordinates {
+  (0.08,{缓存命中路径})
+  (0.31,{基线命中路径})
+  (1.14,{指纹失配路径})
+  (1.35,{结构差分路径})
+};
+\addplot[fill=aegisred!45, draw=aegisred!80] coordinates {
+  (5.00,{设计指标上限})
+};
+\end{axis}
+\end{tikzpicture}
+\caption{各检测路径的平均时延对比}
+\label{fig:latency}
+\end{figure}
+
+\subsubsection{性能指标汇总}
+
+系统在实际测试中的关键性能指标汇总于 \cref{tab:perf-summary}。
+全部指标均达成设计要求。
+
+\begin{table}[htbp]
+\centering
+\caption{系统性能指标达成情况}
+\label{tab:perf-summary}
+\small
+\begin{tabular}{@{}l l l c@{}}
+\toprule
+\textbf{指标} & \textbf{设计要求} & \textbf{实测值} & \textbf{达成} \\
+\midrule
+平均检测时延   & $\leq 5$~ms   & 0.93~ms  & \checkmark \\
+单元测试通过率 & 100\%         & 63/63    & \checkmark \\
+误报率         & $< 1\%$       & 0        & \checkmark \\
+漏报率         & 0             & 0        & \checkmark \\
+审计链完整性   & 校验通过      & 通过     & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{性能优化措施}
+
+系统采用四项优化措施控制检测开销，见 \cref{tab:perf-opt}。
+其中指纹缓存的效果最为显著：重复语句的检测时延降至 0.08~ms 量级。
+
+\begin{table}[htbp]
+\centering
+\caption{性能优化措施及其效果}
+\label{tab:perf-opt}
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{优化点} & \textbf{措施} & \textbf{效果} \\
+\midrule
+语法分析开销 & 语句到指纹的最近最少使用缓存 & 重复语句降至 0.08~ms \\
+基线查询     & 内存哈希表，启动时全量加载   & 常数时间查找 \\
+事件上报     & 异步队列与批量提交           & 不阻塞业务线程 \\
+差分计算     & 仅在指纹失配时触发           & 正常路径零额外开销 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{结果分析与讨论}
+\label{subsec:result-analysis}
+
+\subsubsection{关于第一轮中的五项未复现用例}
+
+\cref{tab:three-round-result} 中，TC-04、TC-05、TC-07、TC-10 与 TC-11
+在第一轮未标记为复现。需要说明的是，这并不意味着相应漏洞不存在，
+而是靶场对该类载荷返回了错误响应而非成功执行的结果。
+
+以 TC-05（时间盲注）为例：载荷 \code{1' AND SLEEP(2) --} 在拼接后
+构成语法有效的语句并被数据库接受，注入客观成立；但由于测试所用的嵌入式
+数据库对延时函数的支持与生产数据库存在差异，响应未呈现预期的延迟特征，
+判定脚本据此未标记为复现。类似情形亦见于其余四项。
+
+这一现象揭示了漏洞验证中的一个方法论要点：\emph{判定漏洞是否存在的依据
+应是攻击载荷能否改变程序的执行语义，而非其是否产生了特定的可观测效果}。
+后者受运行环境影响，可能造成对漏洞存在性的低估。第二轮中这五项用例
+均被成功拦截，恰说明检测引擎识别出了载荷的注入语义。
+
+\subsubsection{关于业务逻辑类漏洞的防线归属}
+
+七项业务逻辑类用例在第二轮标记为不适用，这是架构设计的必然结果而非缺陷。
+以水平越权为例：网关观测到请求 \code{GET /api/notes/detail?id=4}，
+该请求是否越权取决于\zh{当前会话主体是否为该资源的属主}——
+这一信息存在于应用的会话状态中，网关不可见。
+
+同理，服务端请求伪造的判定需要域名解析结果，令牌算法混淆的判定需要
+服务端密钥配置。此类漏洞的正确防线是应用代码层，本文的靶场安全实现
+已提供相应修复并在第三轮验证有效。
+
+明确各类漏洞的\emph{适当防线}，避免将所有防护责任压给单一组件，
+是安全架构设计的基本要求。将业务逻辑漏洞的防护强行下沉至网关，
+在技术上要求网关理解应用的全部业务语义，既不现实也不可维护。

@@ -1,0 +1,558 @@
+% ============================================================
+%  第 4 章  核心算法设计
+% ============================================================
+\section{核心算法设计}
+\label{sec:algorithms}
+
+本章是全文的技术核心。\cref{subsec:overview-alg} 给出算法总体流程；
+\cref{subsec:normalize} 至 \cref{subsec:fingerprint} 依次阐述归一化、
+语法分析与结构指纹的构造，并形式化证明指纹的三条关键性��；
+\cref{subsec:diff} 提出结构差分定位算法；
+\cref{subsec:risk-feature} 与 \cref{subsec:scoring} 分别给出风险特征检测
+与综合评分模型；\cref{subsec:xss} 阐述跨站脚本的语义净化方法。
+
+\subsection{算法总体流程}
+\label{subsec:overview-alg}
+
+检测流程如 \cref{fig:algo-pipeline} 所示。载荷首先经过多重归一化以消解编码
+混淆，随后由词法与语法分析构建抽象语法树；语法树经字面量归一化与规范化序列化
+后计算结构指纹；指纹与基线比对，命中则放行，失配则进入结构差分定位与风险评分。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=5.5mm]
+
+\node[block, minimum width=26mm] (p1) {① 多重归一化\\[-2pt]{\scriptsize 解码至不动点}};
+\node[block, below=of p1, minimum width=26mm] (p2)
+  {② 词法分析\\[-2pt]{\scriptsize 消解注释拆分}};
+\node[block, below=of p2, minimum width=26mm] (p3)
+  {③ 语法分析\\[-2pt]{\scriptsize 构建语法树}};
+\node[block, fill=aegisblue!10, draw=aegisblue!80, line width=0.8pt,
+      below=of p3, minimum width=26mm] (p4)
+  {④ 字面量归一化\\[-2pt]{\scriptsize 抹除常量取值}};
+\node[block, fill=aegisblue!10, draw=aegisblue!80, line width=0.8pt,
+      below=of p4, minimum width=26mm] (p5)
+  {⑤ 规范化序列化\\[-2pt]{\scriptsize 消解书写差异}};
+\node[block, below=of p5, minimum width=26mm] (p6)
+  {⑥ 计算结构指纹};
+
+\node[block, right=16mm of p6, minimum width=24mm] (p7) {⑦ 基线比对};
+\node[blockalt, above=of p7, minimum width=24mm] (pass) {放行\\[-2pt]{\scriptsize 结构一致}};
+\node[blockred, right=14mm of p7, minimum width=26mm] (p8)
+  {⑧ 结构差分定位\\[-2pt]{\scriptsize 路径签名多重集差}};
+\node[block, above=of p8, minimum width=26mm] (p9)
+  {⑨ 风险特征检测\\[-2pt]{\scriptsize 冷启动兜底}};
+\node[blockred, above=of p9, minimum width=26mm] (p10)
+  {⑩ 综合评分与处置};
+
+\draw[flow] (p1) -- (p2);
+\draw[flow] (p2) -- (p3);
+\draw[flow] (p3) -- (p4);
+\draw[flow] (p4) -- (p5);
+\draw[flow] (p5) -- (p6);
+\draw[flow] (p6) -- (p7);
+\draw[flow] (p7) -- node[right, lbl] {命中} (pass);
+\draw[flowred] (p7) -- node[above, lbl] {失配} (p8);
+\draw[flow] (p8) -- (p9);
+\draw[flow] (p9) -- (p10);
+
+\node[lbl, left=2mm of p4.west, align=right, text width=20mm]
+  {核心步骤\\赋予指纹\\参数无关性};
+\node[lbl, left=2mm of p5.west, align=right, text width=20mm]
+  {核心步骤\\赋予指纹\\形态无关性};
+
+\end{tikzpicture}
+\caption{结构指纹检测算法的处理流水线}
+\label{fig:algo-pipeline}
+\end{figure}
+
+\subsection{载荷多重归一化}
+\label{subsec:normalize}
+
+\subsubsection{设计动机}
+
+编码是攻击者规避文本匹配最直接的手段。\cref{tab:obfuscation} 列举了常见的
+混淆形式。若不做归一化，任何后续检测均可被单次 URL 编码轻易绕过。
+
+\begin{table}[htbp]
+\centering
+\caption{常见编码混淆手法及其归一化结果}
+\label{tab:obfuscation}
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{混淆手法} & \textbf{示例} & \textbf{归一化后} \\
+\midrule
+URL 单重编码   & \code{\%27\%20OR\%201\%3D1}      & \code{' OR 1=1} \\
+URL 双重编码   & \code{\%2527\%2520OR}            & \code{' OR} \\
+HTML 实体编码  & \code{\&\#39; OR 1=1}            & \code{' OR 1=1} \\
+Unicode 转义   & \code{\textbackslash u0027 OR}   & \code{' OR} \\
+全角字符       & \code{′ ＯＲ １＝１}              & \code{' OR 1=1} \\
+方言内联注释   & \code{/*!50000UNION*/}           & \code{UNION} \\
+空白与控制字符 & \code{OR\textbackslash t\textbackslash n 1=1} & \code{OR 1=1} \\
+大小写混淆     & \code{oR uNiOn}                  & \code{or union} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{不动点解码}
+
+单次解码不足以应对多重编码。本文采用\emph{循环解码至不动点}的策略：
+反复施加解码算子直至内容不再变化。设 $D$ 为复合解码算子，$s_0$ 为原始载荷，
+则解码序列为
+\begin{equation}
+s_{k+1} = D(s_k), \qquad k = 0, 1, 2, \ldots
+\end{equation}
+终止条件为 $s_{k+1} = s_k$（达到不动点）或 $k \geq K_{\max}$。
+
+\begin{remark}[解码深度上限的必要性]
+$K_{\max}$ 的设置并非工程妥协，而是必要的安全措施。攻击者可构造极深的嵌套
+编码，使解码过程消耗大量计算资源，形成拒绝服务攻击（对应威胁 T-06）。
+本文取 $K_{\max} = 5$，同时将\emph{解码深度本身}作为风险信号：正常业务请求
+几乎不会出现三重以上编码，故 $k \geq 3$ 时额外累加风险分。
+\end{remark}
+
+\subsection{词法与语法分析}
+\label{subsec:parsing}
+
+\subsubsection{词法分析中的注释处理}
+
+词法分析阶段需处理一个易被忽视的细节：\emph{数据库方言的可执行注释}。
+MySQL 支持形如 \code{/*!50000UNION*/} 的语法，其内容\textbf{会被真实执行}。
+若词法器将其作为普通注释整体丢弃，攻击载荷将退化为无害文本，造成严重漏报。
+
+因此本文对两类注释采取不同策略：普通注释 \code{/*...*/} 识别为注释单元并在
+后续过滤中丢弃，使被拆分的关键字重新相邻；可执行注释 \code{/*!...*/} 则
+递归切分其内容并作为正常词法单元加入序列，同时标记来源以供风险评估。
+
+\subsubsection{容错语法分析}
+
+攻击载荷常导致 SQL 语法非法。若解析器遇错即抛出异常，检测将随之失效——
+\emph{解析失败本身不能成为绕过手段}。为此，本文的递归下降解析器采用容错策略：
+无法识别的片段封装为未知节点并继续解析，保证任何输入都能得到一棵可分析的树。
+同时设置递归深度上限，防御深层嵌套构造引发的栈溢出。
+
+\subsection{抽象语法树结构指纹}
+\label{subsec:fingerprint}
+
+\subsubsection{核心思想}
+
+结构指纹方法建立于如下观察之上：
+
+\begin{keybox}
+一条 SQL 语句的\textbf{语义结构}由其语法树的形状唯一决定，
+与树中字面量的具体取值无关，也与语句的文本书写形式无关。
+而注入攻击的本质目的正是\textbf{改变语义结构}。
+\end{keybox}
+
+\cref{fig:ast-compare} 直观展示了这一观察。左侧两条语句仅参数取值不同，
+其语法树完全同构；右侧语句因注入而在 WHERE 子树中新增了一个 OR 节点，
+结构发生实质变化。
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[b]{0.46\textwidth}
+\centering
+\begin{tikzpicture}[level distance=9mm, sibling distance=15mm,
+                    edge from parent/.style={draw=aegisgray!70, line width=0.55pt}]
+\node[astnode] {SELECT}
+  child {node[astnode] {FROM \code{notes}}}
+  child {node[astnode] {WHERE}
+    child {node[astnode] {AND}
+      child {node[astnode] {\code{owner} = ?}}
+      child {node[astnode] {\code{id} = ?}}
+    }
+  };
+\end{tikzpicture}
+\caption{合法查询的归一化语法树}
+\label{fig:ast-normal}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.50\textwidth}
+\centering
+\begin{tikzpicture}[level distance=9mm, sibling distance=13mm,
+                    edge from parent/.style={draw=aegisgray!70, line width=0.55pt}]
+\node[astnode] {SELECT}
+  child {node[astnode] {FROM \code{notes}}}
+  child {node[astnode] {WHERE}
+    child {node[astnode] {AND}
+      child {node[astnode] {\code{owner} = ?}}
+      child {node[astnode] {\code{id} = ?}}
+    }
+    child[edge from parent/.style={draw=aegisred!85, line width=0.9pt}]
+      {node[astinj] {OR}
+        child[edge from parent/.style={draw=aegisred!85, line width=0.9pt}]
+          {node[astinj] {? = ?}}
+      }
+  };
+\end{tikzpicture}
+\caption{注入后的语法树，红色为变异结构}
+\label{fig:ast-injected}
+\end{subfigure}
+\caption{合法查询与注入查询的语法树结构对比}
+\label{fig:ast-compare}
+\end{figure}
+
+\subsubsection{形式化定义}
+
+\begin{definition}[抽象语法树]
+设 $\Sigma_N$ 为节点类型集合，$\Sigma_V$ 为节点值域。抽象语法树
+$T = (V, E, \tau, \nu)$ 是一棵有根有序树，其中 $V$ 为节点集，$E$ 为边集，
+$\tau: V \to \Sigma_N$ 为类型映射，$\nu: V \to \Sigma_V \cup \{\bot\}$
+为值映射。
+\end{definition}
+
+\begin{definition}[字面量归一化算子]
+归一化算子 $\Norm: T \to T'$ 将语法树中所有字面量节点的值替换为统一占位符
+$\square$，同时保留表名、列名、函数名与运算符：
+\begin{equation}
+\nu'(v) =
+\begin{cases}
+\square, & \tau(v) = \textsc{Literal} \wedge \nu(v) \notin \mathcal{L}_{\text{sem}} \\
+\nu(v),  & \text{其他}
+\end{cases}
+\end{equation}
+其中 $\mathcal{L}_{\text{sem}} = \{\texttt{NULL}, \texttt{TRUE}, \texttt{FALSE}\}$
+为参与逻辑判断、不可归一化的语义字面量。
+\end{definition}
+
+\begin{definition}[结构指纹]
+设 $\Ser$ 为规范化序列化算子，$H$ 为密码学哈希函数，$e$ 为接口标识。
+语句 $q$ 在接口 $e$ 上的结构指纹定义为
+\begin{equation}
+\fp(q, e) = H\bigl(e \,\Vert\, \Ser(\Norm(\text{parse}(q)))\bigr)
+\label{eq:fingerprint}
+\end{equation}
+其中 $\Vert$ 表示字符串连接。
+\end{definition}
+
+\begin{remark}[指纹绑定接口标识的理由]
+式 \eqref{eq:fingerprint} 中将接口标识 $e$ 纳入哈希输入并非冗余。
+若指纹全局共享，攻击者可将接口 $A$ 的合法结构用于接口 $B$ 以绕过检测。
+绑定 $e$ 后基线成为接口级隔离，此类跨接口复用攻击自然失效。
+\end{remark}
+
+\subsubsection{指纹的关键性质}
+
+\begin{property}[参数无关性]
+\label{prop:param}
+设 $q_1, q_2$ 为两条语句，若二者的语法树在字面量归一化后同构，则
+$\fp(q_1, e) = \fp(q_2, e)$。
+\end{property}
+
+\begin{proof}
+由归一化算子的定义，所有非语义字面量被替换为同一占位符 $\square$。
+若 $\Norm(T_1) \cong \Norm(T_2)$，则二者的规范化序列化结果相同，
+即 $\Ser(\Norm(T_1)) = \Ser(\Norm(T_2))$。代入式 \eqref{eq:fingerprint}
+即得 $\fp(q_1,e) = \fp(q_2,e)$。
+\end{proof}
+
+\begin{property}[形态无关性]
+\label{prop:form}
+设 $q$ 为一条语句，$\phi$ 为任意不改变语义的文本变换（含大小写变换、
+空白调整、注释插入、编码变换），则 $\fp(\phi(q), e) = \fp(q, e)$。
+\end{property}
+
+\begin{proof}
+分两步说明。其一，编码类变换由多重归一化在解析前消解，故解析器接收到的
+输入相同。其二，大小写、空白与注释类变换由词法分析消解：关键字统一大写、
+标识符统一小写、空白折叠、普通注释丢弃。因此二者产生相同的词法单元序列，
+进而构建同构的语法树，由\cref{prop:param}即得结论。
+\end{proof}
+
+\begin{property}[结构敏感性]
+\label{prop:sensitive}
+若语句 $q'$ 相对 $q$ 引入了新的语法节点或删除了原有节点（即
+$\Norm(T') \not\cong \Norm(T)$），则在哈希函数抗碰撞的前提下，
+$\fp(q', e) \neq \fp(q, e)$ 以压倒性概率成立。
+\end{property}
+
+\begin{proof}
+规范化序列化算子 $\Ser$ 是单射的：不同构的归一化语法树产生不同的序列化字符串
+（因序列化保留了完整的节点类型与层次信息）。故
+$\Ser(\Norm(T')) \neq \Ser(\Norm(T))$。由哈希函数的抗碰撞性，
+二者哈希值相等的概率可忽略。
+\end{proof}
+
+\cref{prop:form}与\cref{prop:sensitive}共同构成了本方法的理论基础：
+\textbf{攻击者可自由操纵文本形态（指纹不变），但一旦改变语义结构
+（这正是注入的目的），指纹必然改变。}二者的正交性使得编码混淆类绕过
+在原理上失效，而非依赖对已知手法的枚举。
+
+\subsubsection{两处关键的工程决策}
+
+形式化定义之外，实际实现中有两处细节直接影响方法的可用性，值得专门说明。
+
+\paragraph{IN 列表的长度无关化。}
+考虑 \code{col IN (1,2)} 与 \code{col IN (1,2,3)}。二者业务语义相同，
+仅参数个数不同。若不做处理，每种列表长度都会产生独立指纹，导致基线数量
+随参数个数线性膨胀（即\emph{基线爆炸}）。本文在归一化阶段将连续的占位符
+折叠为单个，使 \code{IN (?, ?, ?)} 收敛为 \code{IN (?)}。
+
+\paragraph{函数名的保留。}
+一个易犯的错误是将函数名也纳入归一化。但 \code{SLEEP}、\code{BENCHMARK}、
+\code{LOAD\_FILE}、\code{EXTRACTVALUE} 等函数是时间盲注与带外注入的核心标志。
+若将其归一化，最危险的一类攻击将完全漏报。因此本文明确保留函数名，
+仅归一化其参数。
+
+\subsection{结构差分定位算法}
+\label{subsec:diff}
+
+\subsubsection{问题与算法选型}
+
+指纹比对只能回答\zh{结构是否变化}，无法回答\zh{变在何处}。后者对安全取证
+至关重要——运营人员需要知道攻击注入在语法树的哪个位置，方能理解攻击意图
+并评估影响范围。
+
+树结构的差异度量有成熟的理论工具，即树编辑距离\cite{zhang1989simple}。
+但经典的 Zhang-Shasha 算法复杂度为 $O(n^2 \cdot d^2)$（$d$ 为树深），
+在网关热路径上不可接受\cite{bille2005survey}。
+
+本文注意到：安全检测并不需要\emph{最小编辑脚本}，只需知道\emph{哪些结构是
+新增的、哪些是缺失的}。这一弱化的需求允许采用复杂度低得多的方案。
+
+\subsubsection{路径签名多重集差分}
+
+\begin{definition}[节点路径签名]
+节点 $v$ 的路径签名定义为从根到 $v$ 的类型路径与节点自身特征的拼接：
+\begin{equation}
+\sigma(v) = \sigma(\text{parent}(v)) \,\Vert\, \tau(v) \,\Vert\, \kappa(v)
+\end{equation}
+其中 $\kappa(v)$ 为节点的判别特征。对函数调用、表引用、列引用与运算符节点，
+$\kappa(v) = \nu(v)$；对已归一化的字面量节点，$\kappa(v) = \varepsilon$。
+\end{definition}
+
+\begin{definition}[签名多重集]
+语法树 $T$ 的签名多重集为 $\Sig(T) = \{\!\{\sigma(v) : v \in V(T)\}\!\}$。
+\end{definition}
+
+设基线树为 $T_b$、实际树为 $T_a$，则新增结构与缺失结构分别为多重集差：
+\begin{equation}
+\Delta^{+} = \Sig(T_a) \setminus \Sig(T_b), \qquad
+\Delta^{-} = \Sig(T_b) \setminus \Sig(T_a)
+\end{equation}
+
+结构相似度采用 Jaccard 系数度量：
+\begin{equation}
+\jac(T_b, T_a) = \frac{|\Sig(T_b) \cap \Sig(T_a)|}{|\Sig(T_b) \cup \Sig(T_a)|}
+\label{eq:jaccard}
+\end{equation}
+
+\begin{proposition}[复杂度]
+签名多重集的构建与差分运算的时间复杂度为 $O(n)$，空间复杂度为 $O(n)$，
+其中 $n = |V(T_a)| + |V(T_b)|$。
+\end{proposition}
+
+\begin{proof}
+签名构建通过一次深度优先遍历完成，每个节点常数次操作，故为 $O(n)$。
+多重集以哈希表实现，差分与交并运算的期望复杂度均为 $O(n)$。
+\end{proof}
+
+\subsubsection{变异的语义标注}
+
+差分结果 $\Delta^{+}$ 与 $\Delta^{-}$ 是结构层面的描述，尚需映射为具有
+安全语义的攻击手法分类，方能为运营人员所理解。
+\cref{tab:diff-kinds} 给出映射规则。
+
+\begin{table}[htbp]
+\centering
+\caption{结构变异的语义分类规则}
+\label{tab:diff-kinds}
+\footnotesize
+\begin{tabular}{@{}l p{5.0cm} l c@{}}
+\toprule
+\textbf{分类} & \textbf{判定条件} & \textbf{安全含义} & \textbf{权重} \\
+\midrule
+恒真式       & 新增比较节点两侧归一化后同构 & 认证绕过     & 40 \\
+OR 逻辑注入  & WHERE 子树新增析取节点       & 条件旁路     & 40 \\
+联合查询注入 & 新增集合运算节点             & 跨表数据读取 & 40 \\
+堆叠查询     & 解析出多条独立语句           & 任意语句执行 & 40 \\
+危险函数调用 & 新增节点属危险函数名单       & 盲注或带外   & 40 \\
+系统表访问   & 表引用指向元数据表           & 信息收集     & 40 \\
+注释截断     & 尾部注释导致原结构缺失       & 条件剥离     & 25 \\
+子查询注入   & 新增嵌套查询节点             & 嵌套推断     & 25 \\
+条件剥离     & $\Delta^{-}$ 含 WHERE 条件节点 & 全表泄露   & 25 \\
+投影列扩展   & 投影列数量增加               & 信息扩展     & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{算法描述}
+
+\cref{alg:diff} 给出完整的结构差分算法。
+
+\begin{algorithm}[htbp]
+\caption{基于路径签名多重集的结构差分定位}
+\label{alg:diff}
+\small
+\Input{基线归一化语法树 $T_b$，实际归一化语法树 $T_a$}
+\Output{差分结果：相似度 $\jac$、变异标注集合 $A$}
+\BlankLine
+\If{$T_b = \varnothing$}{
+  \tcp{冷启动：无基线时退化为绝对结构风险分析}
+  \Return $\textsc{AnalyzeAbsoluteRisk}(T_a)$\;
+}
+$\Sig_b \leftarrow \textsc{CollectSignatures}(T_b)$\;
+$\Sig_a \leftarrow \textsc{CollectSignatures}(T_a)$\;
+$\Delta^{+} \leftarrow \Sig_a \setminus \Sig_b$;\quad
+$\Delta^{-} \leftarrow \Sig_b \setminus \Sig_a$\;
+$\jac \leftarrow |\Sig_b \cap \Sig_a| \,/\, |\Sig_b \cup \Sig_a|$\;
+\If{$\Delta^{+} = \varnothing \wedge \Delta^{-} = \varnothing$}{
+  \Return $(\jac = 1, A = \varnothing)$ \tcp*{结构完全一致}
+}
+$A \leftarrow \varnothing$\;
+\tcp{依据 \cref{tab:diff-kinds} 对变异结构进行语义分类}
+\ForEach{分类规则 $r$}{
+  \If{$r$ 的判定条件在 $(\Delta^{+}, \Delta^{-}, T_a, T_b)$ 上成立}{
+    $A \leftarrow A \cup \{(\text{kind}(r), \text{path}, \text{snippet})\}$\;
+  }
+}
+\If{$A = \varnothing$}{
+  $A \leftarrow \{(\textsc{StructureAdded}, \Delta^{+}[0], \cdot)\}$
+  \tcp*{兜底标注}
+}
+\Return $(\jac, A)$\;
+\end{algorithm}
+
+\subsection{风险特征检测}
+\label{subsec:risk-feature}
+
+\subsubsection{设计动机}
+
+基线的建立需要时间。系统初次部署或遇到新接口时基线为空，此时若\zh{一律拦截}
+将阻断正常业务，若\zh{一律放行}则防护形同虚设。因此需要一套\emph{不依赖基线}
+的绝对判定规则。
+
+\begin{keybox}
+须强调本文的\zh{风险特征}与传统 WAF 规则的本质区别：本文的特征作用于
+\textbf{已解析完成的语法树结构}，而非原始文本的正则匹配。
+
+以恒真式判定为例。传统做法是匹配字符串 \code{1=1}，可被 \code{2>1}、
+\code{'a'='a'} 等无穷变形绕过；本文的做法是检查语法树中比较节点的两个
+操作数在归一化后是否结构等价，这一判据覆盖了恒真式的\emph{所有}写法。
+\end{keybox}
+
+\subsubsection{特征清单}
+
+\cref{tab:risk-features} 给出 15 项风险特征。权重依据该特征在正常业务中
+出现的可能性确定：权重 40 以上者为\emph{确定性攻击标志}，即正常业务查询
+不可能出现的结构。
+
+\begin{table}[htbp]
+\centering
+\caption{语法树层面的风险特征清单}
+\label{tab:risk-features}
+\footnotesize
+\begin{tabular}{@{}l l p{5.8cm} c@{}}
+\toprule
+\textbf{编号} & \textbf{特征} & \textbf{判定方式} & \textbf{权重} \\
+\midrule
+R-01 & 恒真条件     & 比较节点两侧归一化后结构等价 & 40 \\
+R-02 & 联合查询     & 根节点为集合运算            & 45 \\
+R-03 & 堆叠查询     & 解析出多条独立语句          & 50 \\
+R-04 & 注释截断     & 尾部注释符后原结构缺失      & 35 \\
+R-05 & 时间盲注函数 & 函数名属延时函数集合        & 50 \\
+R-06 & 带外与文件函数 & 函数名属文件或外带函数集合 & 50 \\
+R-07 & 系统表访问   & 表引用指向数据库元数据表    & 45 \\
+R-08 & 布尔盲注     & 比较节点中嵌套子查询        & 35 \\
+R-09 & 编码绕过     & 出现十六进制字面量或字符构造函数 & 25 \\
+R-10 & 过度编码     & 归一化解码深度不低于 3      & 20 \\
+R-11 & 逻辑运算异常 & 布尔运算符数量超出正常水平  & 20 \\
+R-12 & 指纹探测     & 调用版本或用户信息函数      & 30 \\
+R-13 & 内联注释混淆 & 语法树含方言可执行注释来源的节点 & 30 \\
+R-14 & 解析异常     & 语句无法完整解析            & 20 \\
+R-15 & 结构变更操作 & 查询接口中出现数据定义语句  & 45 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{综合风险评分模型}
+\label{subsec:scoring}
+
+综合评分融合三个来源的证据：结构偏离程度、变异语义标注与风险特征命中。
+定义综合风险分为
+\begin{equation}
+S = \min\Bigl(100,\ \underbrace{\alpha\,(1 - \jac)}_{\text{结构偏离}}
+  + \underbrace{\textstyle\sum_{a \in A} w(a)}_{\text{变异标注}}
+  + \underbrace{\textstyle\sum_{f \in F} w(f)}_{\text{风险特征}}
+  + \underbrace{\beta \cdot k}_{\text{编码可疑度}}\Bigr)
+\label{eq:score}
+\end{equation}
+其中 $\jac$ 为式 \eqref{eq:jaccard} 定义的结构相似度，$A$ 为变异标注集合，
+$F$ 为命中的风险特征集合，$k$ 为解码深度，$\alpha = 50$、$\beta = 5$ 为
+权重系数。
+
+处置策略依据 $S$ 分级：
+\begin{equation}
+\text{verdict} =
+\begin{cases}
+\textsc{Block},   & S \geq 70 \\
+\textsc{Monitor}, & 50 \leq S < 70 \\
+\textsc{Pass},    & S < 50
+\end{cases}
+\end{equation}
+
+\subsubsection{误报抑制机制}
+
+\cref{prop:sensitive}保证了结构敏感性，但过度敏感会引入误报。本文设置
+三重抑制机制：
+
+\begin{enumerate}
+  \item \textbf{基线优先}：指纹命中基线时直接放行，不计算风险分。
+        这保证了正常业务查询即使包含某些\zh{可疑}特征（如业务本身需要 OR 条件），
+        只要结构与基线一致即视为安全。
+  \item \textbf{相似度容差}：当 $\jac > 0.95$ 且无严重级别标注时，
+        视为等价结构予以放行，容忍解析层面的微小差异。
+  \item \textbf{接口级豁免}：允许管理员对特定接口或参数设置例外规则。
+\end{enumerate}
+
+\subsection{跨站脚本的语义净化}
+\label{subsec:xss}
+
+\subsubsection{正则方案的失效}
+
+用正则表达式过滤跨站脚本是经典的反面教材。过滤 \code{<script>} 可用
+\code{<img onerror>} 绕过；过滤 \code{onerror} 可用 \code{<svg onload>} 绕过；
+过滤所有已知标签仍可被伪协议、实体编码、大小写混淆、属性换行分隔等手法穿透。
+黑名单的根本缺陷在于：它要求防御方\emph{穷举}所有攻击形式，而这在原理上不可完成。
+
+\subsubsection{基于文档对象模型的三级白名单}
+
+本文采取与 SQL 检测一致的方法论：\emph{把 HTML 当作 HTML 来解析}。
+内容按 HTML 规范构建为文档对象模型树后，依据三级白名单逐节点裁决，
+如 \cref{tab:xss-allowlist} 所示。
+
+\begin{table}[htbp]
+\centering
+\caption{跨站脚本净化的三级白名单模型}
+\label{tab:xss-allowlist}
+\small
+\begin{tabular}{@{}l p{8.4cm}@{}}
+\toprule
+\textbf{层级} & \textbf{裁决规则} \\
+\midrule
+一级：标签 & 仅允许排版与结构类标签。
+  \code{script}、\code{iframe}、\code{object}、\code{svg}、\code{math}、
+  \code{form}、\code{style} 等具备脚本执行或资源加载能力的标签一律移除 \\
+二级：属性 & 按标签细分允许属性。\textbf{所有 \code{on*} 事件属性与
+  \code{style} 属性一律禁止} \\
+三级：协议 & \code{href}、\code{src} 等 URL 属性的协议须属
+  $\{$\code{http}, \code{https}, \code{mailto}, \code{tel}$\}$。
+  \code{javascript:}、\code{data:}、\code{vbscript:} 一律拒绝 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{协议判定的关键细节}
+
+协议判定前\emph{必须}先剥离空白与控制字符并执行多重解码，否则以下变形
+均可绕过：\code{java\textbackslash tscript:}（制表符分隔）、
+\code{\ \ javascript:}（前导空白）、\code{java\&\#115;cript:}（实体编码）、
+\code{JaVaScRiPt:}（大小写混淆）。这一细节与 SQL 检测中的归一化前置
+遵循同一原理。
+
+\begin{keybox}
+白名单机制的根本优势在于：\textbf{即使出现未知的新型绕过手法，只要它依赖
+白名单之外的标签或属性，就自动失效}。防护能力不依赖于对攻击手法的穷举，
+这与\cref{prop:sensitive}所述的结构指纹优势在方法论上是一致的。
+\end{keybox}

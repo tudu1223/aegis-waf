@@ -18,6 +18,7 @@
 [![OWASP](https://img.shields.io/badge/OWASP%20Top%2010-2021%20covered-success.svg?style=flat-square)](#覆盖的-owasp-top-10-类别--owasp-coverage)
 [![Detection](https://img.shields.io/badge/Avg%20Latency-0.93ms-brightgreen.svg?style=flat-square)](#测试结果--test-results)
 [![High Risk](https://img.shields.io/badge/CVSS%20%E2%89%A57.0-18%2F18%20protected-success.svg?style=flat-square)](#测试结果--test-results)
+[![Report](https://img.shields.io/badge/Report-57%20pages%20LaTeX-B45309.svg?style=flat-square&logo=latex&logoColor=white)](report/AEGIS-综合设计报告.pdf)
 
 [简体中文](#简体中文) · [English](#english)
 
@@ -237,7 +238,26 @@ aegis-waf/
 │       ├── vuln/            ⚠ 脆弱实现（教学用）
 │       └── safe/            ✓ 安全实现（修复对照）
 ├── aegis-web/          前端
+├── report/             LaTeX 综合设计报告
+├── docs/design/        设计文档
 └── tests/              安全测试脚本
+```
+
+### 设计报告
+
+项目配套一份 57 页的综合设计报告，采用 LaTeX 排版，涵盖威胁建模、
+算法的形式化定义与性质证明、系统设计、实验评估与结果分析。
+
+- 成品：[`report/AEGIS-综合设计报告.pdf`](report/AEGIS-综合设计报告.pdf)
+- 源码：`report/` 目录
+
+重新编译（需 TeX Live 2023+，含 ctex 与 pgfplots）：
+
+```bash
+cd report
+./build.sh          # 完整编译（含参考文献）
+./build.sh quick    # 快速编译
+./build.sh clean    # 清理中间文件
 ```
 
 ### 代码约定
@@ -421,6 +441,24 @@ Unit tests: `mvn -pl aegis-core test` — **63/63 passing**
 **Backend** JDK 17 · Spring Boot 3.2 · ByteBuddy · jsoup · Caffeine · H2/MySQL · JJWT
 **Frontend** Vue 3 · Vite 5 · Pinia · ECharts 5 · AntV G6 · SCSS
 **Testing** JUnit 5 · Python
+
+### Design Report
+
+A 57-page comprehensive design report typeset in LaTeX accompanies this project,
+covering threat modeling, formal definitions and property proofs of the
+fingerprinting algorithm, system design, and experimental evaluation.
+
+- PDF: [`report/AEGIS-综合设计报告.pdf`](report/AEGIS-综合设计报告.pdf)
+- Source: `report/` directory
+
+To rebuild (requires TeX Live 2023+ with ctex and pgfplots):
+
+```bash
+cd report
+./build.sh          # Full build including bibliography
+./build.sh quick    # Quick build
+./build.sh clean    # Remove intermediates
+```
 
 ### Known Limitations
 

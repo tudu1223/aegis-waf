@@ -1,0 +1,366 @@
+% ============================================================
+%  第 3 章  系统设计
+% ============================================================
+\section{系统设计}
+\label{sec:design}
+
+\subsection{设计原则}
+
+系统设计遵循以下四项安全工程原则，它们与 GB/T 25070 关于安全设计技术要求的
+规定保持一致\cite{gbt25070}。
+
+\begin{itemize}
+  \item \textbf{纵深防御}：不依赖任何单点防护。同一威胁由网关层、探针层与
+        应用代码层分别施加约束，任一层的失效不导致整体防护失守。
+  \item \textbf{最小权限}：探针仅钩取必要的执行点；控制台按角色划分操作权限；
+        靶场的文件访问严格限定于指定根目录之下。
+  \item \textbf{失效安全}：检测组件的异常一律降级为放行并记录，而非阻断业务。
+        这一取舍的依据是：防护组件的可用性故障若转化为业务中断，
+        其危害往往超过被防护的威胁本身。
+  \item \textbf{默认拒绝}：跨站脚本净化与出站地址判定均采用白名单机制，
+        未显式允许者一律拒绝。相较黑名单，白名单对未知攻击手��具有天然的
+        覆盖能力。
+\end{itemize}
+
+\subsection{总体架构}
+
+\subsubsection{架构组成}
+
+系统采用分层架构，由六个模块构成，如 \cref{fig:architecture} 所示。
+其中检测引擎（\code{aegis-core}）作为共享库同时被网关与探针依赖，
+保证两层的判定逻辑严格一致，避免因实现差异导致的防护盲区。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=6mm]
+
+% ===== 展示层 =====
+\node[block, fill=aegisind!6, draw=aegisind!60, minimum width=116mm,
+      minimum height=10mm] (web)
+  {\textbf{aegis-web}\ \ 可视化指挥中心\quad
+   {\scriptsize 态势总览 $\cdot$ 威胁事件 $\cdot$ 语法树分析 $\cdot$ 基线管理 $\cdot$ 攻防演练}};
+
+% ===== 控制层 =====
+\node[block, below=8mm of web, minimum width=116mm, minimum height=10mm] (console)
+  {\textbf{aegis-console}\ \ 控制台服务\quad
+   {\scriptsize 事件汇聚 $\cdot$ 哈希链审计 $\cdot$ 基线管理 $\cdot$ 统计聚合 $\cdot$ 实时推送}};
+
+\draw[<->, line width=0.6pt, color=aegisgray!85] (web) -- (console)
+  node[midway, right, lbl, xshift=2pt] {REST / WebSocket};
+
+% ===== 防护层 =====
+\node[block, below left=12mm and -16mm of console, minimum width=46mm,
+      minimum height=14mm] (gateway)
+  {\textbf{aegis-gateway}\ \ 安全网关\\[1pt]
+   {\scriptsize 参数检测 $\cdot$ 速率限制}\\[-2pt]
+   {\scriptsize 来源信誉 $\cdot$ 追踪标识注入}};
+
+\node[blockalt, below right=12mm and -16mm of console, minimum width=46mm,
+      minimum height=14mm] (target)
+  {\textbf{vuln-target}\ \ 受控靶场\\[1pt]
+   {\scriptsize 内嵌 \textbf{aegis-agent} 探针}\\[-2pt]
+   {\scriptsize 钩取数据库与命令执行}};
+
+\draw[flow] (gateway.east) -- (target.west)
+  node[midway, above, lbl] {反向代理};
+\draw[flow, dashed] (gateway.north) -- ++(0,0.5) -| ($(console.south)+(-2.0,0)$);
+\draw[flow, dashed] (target.north) -- ++(0,0.5) -| ($(console.south)+(2.0,0)$);
+\node[lbl, above=0.5mm of gateway.north, xshift=9mm] {事件上报};
+\node[lbl, above=0.5mm of target.north, xshift=-9mm] {事件上报};
+
+% ===== 引擎层 =====
+\node[block, fill=aegisblue!8, draw=aegisblue!75, line width=0.85pt,
+      below=30mm of console,
+      minimum width=100mm, minimum height=15mm] (core)
+  {\textbf{aegis-core}\ \ 检测引擎内核\\[2pt]
+   {\scriptsize 词法分析 $\cdot$ 语法分析 $\cdot$ 字面量归一化 $\cdot$ 结构指纹 $\cdot$ 路径签名差分}\\[-2pt]
+   {\scriptsize 风险特征 $\cdot$ 语义净化 $\cdot$ 路径与命令检测 $\cdot$ 速率控制}};
+
+\draw[flow] (gateway.south) -- ++(0,-0.4) -| ($(core.north)+(-2.4,0)$);
+\draw[flow] (target.south) -- ++(0,-0.4) -| ($(core.north)+(2.4,0)$);
+
+\node[lbl, below=1.5mm of core.south, align=center]
+  {作为共享库被两层同时依赖，保证判定逻辑严格一致};
+
+\end{tikzpicture}
+\caption{AEGIS 系统总体架构}
+\label{fig:architecture}
+\end{figure}
+
+各模块的职责与技术选型汇总于 \cref{tab:modules}。
+
+\begin{table}[htbp]
+\centering
+\caption{系统模块职责与技术选型}
+\label{tab:modules}
+\small
+\begin{tabular}{@{}l l p{5.2cm} l@{}}
+\toprule
+\textbf{模块} & \textbf{形态} & \textbf{核心职责} & \textbf{关键技术} \\
+\midrule
+\code{aegis-core}    & 共享库      & 检测算法内核 & 自研词法与语法分析器 \\
+\code{aegis-agent}   & Java Agent  & 运行时钩取与确定性判定 & Byte Buddy 字节码注入 \\
+\code{aegis-gateway} & 服务        & 反向代理与启发式预判 & Servlet 过滤器链 \\
+\code{aegis-console} & 服务        & 事件汇聚与审计存证 & Spring Boot, JPA \\
+\code{vuln-target}   & 服务        & 受控靶场 & 双实现对照结构 \\
+\code{aegis-web}     & 单页应用    & 可视化与交互 & Vue 3, AntV G6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{双层联动架构的必要性论证}
+
+本文的架构核心在于网关层与探针层的分工。这一设计并非出于工程便利，
+而是源于二者在\emph{可见性}上的本质差异。以下通过一个具体场景予以说明。
+
+考虑请求参数 \code{keyword = admin}。该值是否构成攻击？
+
+网关层的困境在于：它只能观测到这个字符串本身，无法确知该参数将被拼接进何种
+上下文。若后端使用参数化查询，则该值绝无危害；若后端拼接进 \code{LIKE} 子句，
+它仍是正常查询；唯有当它被拼接进特定位置并配合闭合符号时才可能构成注入。
+网关缺少判定所需的\emph{下游上下文}，因此其判定必然是启发式的，
+在误报与漏报之间只能取折中。
+
+探针层则处于完全不同的位置。它钩取的是数据库驱动的执行入口，此刻 SQL 已完成
+全部拼接。对这样一条已成形的语句，判定不再是\zh{像不像攻击}的概率问题，
+而是\zh{语法结构是否发生变化}的确定性问题。这一差异可归纳为
+\cref{tab:layer-comparison}。
+
+\begin{table}[htbp]
+\centering
+\caption{网关层与探针层的可见性与判定性质对比}
+\label{tab:layer-comparison}
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{维度} & \textbf{网关层} & \textbf{探针层} \\
+\midrule
+部署位置     & HTTP 流量入口     & 应用进程内部 \\
+可见对象     & 请求参数文本      & 已拼接的真实语句 \\
+上下文信息   & 缺失下游上下文    & 具备完整执行上下文 \\
+判定性质     & 启发式预判        & 确定性结构比对 \\
+误报可能     & 存在              & 极低 \\
+拦截时机     & 请求进入前        & 语句执行前 \\
+主要价值     & 快速阻断、速率控制 & 精确取证、结构定位 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+两层的价值互补：网关层以低成本快速滤除明显攻击并承担速率控制职责，
+探针层对通过网关的流量施加确定性校验。二者通过统一的追踪标识关联，
+共同构成完整的证据链。
+
+\subsection{关键流程设计}
+
+\subsubsection{请求检测主流程}
+
+\cref{fig:sequence} 以时序图形式给出一次攻击请求的完整处理流程。
+需特别关注第 ⑨ 步：探针在语句送达数据库\emph{之前}抛出安全异常，
+使攻击在产生任何实际效果前即被阻断。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize},
+  lifeline/.style={dashed, rulegray!75, line width=0.5pt},
+  msg/.style={->, line width=0.6pt, color=aegisgray!90},
+  msgred/.style={->, line width=0.9pt, color=aegisred!85},
+  actor/.style={draw=aegisblue!65, fill=aegisblue!7, line width=0.55pt,
+                rounded corners=2pt, minimum width=16mm, minimum height=6mm,
+                font=\scriptsize\bfseries}
+]
+
+\def\xa{0} \def\xb{3.0} \def\xc{6.0} \def\xd{9.0} \def\xe{11.9}
+
+% 参与者
+\node[actor] (A) at (\xa,0) {攻击者};
+\node[actor] (B) at (\xb,0) {网关};
+\node[actor] (C) at (\xc,0) {应用};
+\node[actor] (D) at (\xd,0) {探针};
+\node[actor] (E) at (\xe,0) {数据库};
+
+% 生命线
+\foreach \x in {\xa,\xb,\xc,\xd,\xe}
+  \draw[lifeline] (\x,-0.36) -- (\x,-7.3);
+
+% 消息
+\draw[msgred] (\xa,-0.95) -- (\xb,-0.95);
+\node[above, color=aegisred] at ($(\xa,-0.95)!0.5!(\xb,-0.95)$)
+  {① 携带注入载荷的请求};
+
+\node[anchor=west, align=left, color=aegisgray] at (\xb+0.12,-1.72)
+  {② 生成追踪标识\quad ③ 信誉与速率校验\quad ④ 参数启发式判定};
+
+\draw[msg] (\xb,-2.55) -- (\xc,-2.55);
+\node[above] at ($(\xb,-2.55)!0.5!(\xc,-2.55)$) {⑤ 转发（注入追踪标识）};
+
+\node[anchor=west, align=left, color=aegisgray] at (\xc+0.12,-3.28)
+  {⑥ 探针提取追踪标识\quad ⑦ 业务逻辑拼接语句};
+
+\draw[msg] (\xc,-4.1) -- (\xd,-4.1);
+\node[above] at ($(\xc,-4.1)!0.5!(\xd,-4.1)$) {⑧ 执行语句};
+
+\node[anchor=west, align=left, color=aegisred, font=\scriptsize\bfseries]
+  at (\xd+0.12,-4.82) {⑨ 结构指纹比对，判定为注入};
+
+% 阻断
+\draw[msgred] (\xd,-5.62) -- (\xe-0.42,-5.62);
+\node[above, color=aegisred] at ($(\xd,-5.62)!0.5!(\xe,-5.62)$)
+  {⑩ 阻断，不予执行};
+\draw[aegisred, line width=1.2pt]
+  (\xe-0.46,-5.86) -- (\xe-0.16,-5.38);
+\draw[aegisred, line width=1.2pt]
+  (\xe-0.46,-5.38) -- (\xe-0.16,-5.86);
+
+\draw[msg] (\xd,-6.5) -- (\xa,-6.5);
+\node[above] at ($(\xd,-6.5)!0.5!(\xa,-6.5)$) {⑪ 返回 403 与判定依据};
+
+\node[align=center, color=aegisgray, anchor=north] at (5.9,-7.0)
+  {两层事件经统一追踪标识关联，汇聚至控制台形成完整证据链};
+
+\end{tikzpicture}
+\caption{注入攻击的检测与阻断时序}
+\label{fig:sequence}
+\end{figure}
+
+\subsubsection{基线学习与审核流程}
+
+结构指纹的比对需要\emph{基线}作为参照。基线的建立采用\zh{自动学习、人工确认}
+的两阶段流程，如 \cref{fig:baseline-flow} 所示。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=7mm]
+\node[block, minimum width=22mm] (s1) {开启学习模式};
+\node[block, right=8mm of s1, minimum width=26mm] (s2)
+  {探针记录各接口\\[-2pt]{\scriptsize 实际执行的语句}};
+\node[block, right=8mm of s2, minimum width=25mm] (s3)
+  {按结构指纹去重\\[-2pt]{\scriptsize 同结构仅留一份}};
+\node[block, right=8mm of s3, minimum width=23mm] (s4)
+  {标记为待审核\\[-2pt]{\scriptsize LEARNING}};
+
+\node[blockalt, below=10mm of s3, minimum width=27mm] (s5)
+  {\textbf{人工审核确认}\\[-2pt]{\scriptsize 剔除可疑样本}};
+\node[block, fill=aegisteal!8, draw=aegisteal!70, right=8mm of s5,
+      minimum width=23mm] (s6)
+  {转为已确认\\[-2pt]{\scriptsize CONFIRMED}};
+
+\draw[flow] (s1) -- (s2);
+\draw[flow] (s2) -- (s3);
+\draw[flow] (s3) -- (s4);
+\draw[flow] (s4.south) -- ++(0,-0.45) -| (s5.north);
+\draw[flow] (s5) -- (s6);
+
+\node[below=2mm of s5, align=center, lbl, text width=68mm, xshift=8mm]
+  {人工审核不可省略：若学习期内混入攻击流量，其结构将被误记为合法基线，
+   导致同类攻击在后续被放行};
+\end{tikzpicture}
+\caption{SQL 基线的学习与审核流程}
+\label{fig:baseline-flow}
+\end{figure}
+
+\begin{remark}
+基线为空时系统并不失效。此时检测退化为\emph{风险特征判定}模式，
+依据恒真式、集合运算、危险函数调用等\zh{无论何种业务场景都不应出现}的
+绝对特征进行判断，保证系统开箱即用。该机制的细节见 \cref{subsec:risk-feature}。
+\end{remark}
+
+\subsection{数据模型设计}
+
+\subsubsection{检测事件模型}
+
+检测事件是贯穿系统的核心数据实体。其字段设计需同时满足三方面要求：
+支撑实时展示、支撑事后取证、支撑完整性校验。\cref{tab:event-schema}
+给出关键字段及其用途。
+
+\begin{table}[htbp]
+\centering
+\caption{检测事件的关键字段设计}
+\label{tab:event-schema}
+\footnotesize
+\begin{tabular}{@{}l l p{6.0cm}@{}}
+\toprule
+\textbf{字段} & \textbf{类型} & \textbf{用途说明} \\
+\midrule
+\code{event\_id}       & UUID     & 事件唯一标识 \\
+\code{trace\_id}       & UUID     & \textbf{关联同一请求在两层产生的事件} \\
+\code{layer}           & 枚举     & 事件产生层次：网关 / 探针 \\
+\code{threat\_type}    & 枚举     & 威胁类型，对应 OWASP 分类 \\
+\code{severity}        & 枚举     & 严重级别，与 CVSS 区间对齐 \\
+\code{verdict}         & 枚举     & 实际处置：放行 / 记录 / 拦截 \\
+\code{raw\_sql}        & 文本     & 探针捕获的真实语句 \\
+\code{baseline\_fp}    & 字符串   & 基线结构指纹 \\
+\code{actual\_fp}      & 字符串   & 实际结构指纹 \\
+\code{similarity}      & 浮点     & 结构相似度（Jaccard 系数） \\
+\code{diff\_json}      & 文本     & 结构差分结果与可视化数据 \\
+\code{risk\_score}     & 整型     & 综合风险评分 \\
+\code{prev\_hash}      & 字符串   & \textbf{前一条记录的哈希，构成链式依赖} \\
+\code{hash}            & 字符串   & 本条记录的哈希 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+其中 \code{trace\_id} 与哈希链字段是两处关键设计。前者是双层架构得以形成
+完整证据链的技术基础；后者为审计日志提供不可否认性，其原理详见
+\cref{subsec:hashchain}。
+
+\subsubsection{基线模型}
+
+基线实体记录各接口的合法结构指纹。除指纹本身外，还保存归一化后的语句模板与
+语法树的可视化数据：前者供人工审核时判读，后者供前端渲染结构预览。
+状态字段区分学习中、已确认与已禁用三种状态，构成基线的生命周期管理。
+
+\subsection{接口设计}
+
+系统对外接口按用途分为三类，如 \cref{tab:api} 所示。其中内部上报接口
+采用共享密钥认证，防止外部伪造安全事件以掩盖真实攻击或制造告警噪声。
+
+\begin{table}[htbp]
+\centering
+\caption{系统主要接口设计}
+\label{tab:api}
+\footnotesize
+\begin{tabular}{@{}l l p{5.4cm}@{}}
+\toprule
+\textbf{类别} & \textbf{接口} & \textbf{说明} \\
+\midrule
+\multirow{4}{*}{查询类}
+  & \code{GET /api/events}              & 事件分页查询，支持多维过滤 \\
+  & \code{GET /api/events/trace/\{id\}} & \textbf{按追踪标识还原完整证据链} \\
+  & \code{GET /api/events/verify-chain} & 审计日志完整性校验 \\
+  & \code{GET /api/stats/*}             & 统计聚合，供大屏展示 \\
+\midrule
+\multirow{3}{*}{管理类}
+  & \code{PUT /api/policy}              & 切换防护模式与检测参数 \\
+  & \code{GET /api/baselines}           & 基线列表与结构预览 \\
+  & \code{POST /api/baselines/\{id\}/confirm} & 基线人工确认 \\
+\midrule
+\multirow{2}{*}{内部类}
+  & \code{POST /internal/agent/report}  & 探针与网关事件上报 \\
+  & \code{WS /ws/aegis}                 & 实时事件推送通道 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{部署架构}
+
+系统采用分端口部署，各服务职责边界清晰。演示与测试时可通过访问不同端口
+对比\zh{有防护}与\zh{无防护}两种状态下的系统行为，这一设计直接支撑了
+\cref{sec:evaluation} 中的三轮测试方法。端口分配见 \cref{tab:deployment}。
+
+\begin{table}[htbp]
+\centering
+\caption{服务部署与端口分配}
+\label{tab:deployment}
+\small
+\begin{tabular}{@{}c l l@{}}
+\toprule
+\textbf{端口} & \textbf{服务} & \textbf{用途} \\
+\midrule
+5173 & 可视化前端 & 指挥中心界面 \\
+8080 & 控制台服务 & 事件汇聚与管理接口 \\
+8000 & 安全网关   & \textbf{受防护入口，演示时访问此端口} \\
+8090 & 受控靶场   & 直连入口，用于无防护状态对比 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,171 @@
+% ============================================================
+%  附录
+% ============================================================
+\clearpage
+\appendix
+\phantomsection
+\addcontentsline{toc}{section}{附录}
+\section*{附\quad 录}
+\markboth{附录}{附录}
+\setcounter{section}{0}
+\renewcommand{\thesection}{附录~\Alph{section}}
+\renewcommand{\thetable}{\Alph{section}--\arabic{table}}
+\renewcommand{\thefigure}{\Alph{section}--\arabic{figure}}
+\setcounter{table}{0}
+\setcounter{figure}{0}
+
+% ------------------------------------------------------------
+\section{核心算法实现}
+\setcounter{table}{0}
+
+本附录摘录检测引擎的两处核心实现。完整代码见项目仓库。
+
+\subsection*{A.1\quad 字面量归一��}
+
+该方法是结构指纹获得参数无关性的实现基础。其中两处判断值得注意：
+\code{IN} 列表的长度无关化避免了基线爆炸，函数名的保留避免了危险函数漏报。
+
+\begin{lstlisting}[style=javastyle, caption={AST 字面量归一化的核心逻辑}]
+private static void normalizeInPlace(AstNode node) {
+    switch (node.getType()) {
+        case LITERAL -> normalizeLiteral(node);
+
+        case IN_EXPRESSION -> {
+            // IN 列表长度无关化：先归一化子节点，再折叠重复占位符，
+            // 避免 IN (1,2) 与 IN (1,2,3) 产生不同指纹导致基线爆炸
+            for (AstNode child : node.mutableChildren()) {
+                normalizeInPlace(child);
+            }
+            collapseInList(node);
+            return;
+        }
+
+        case FUNCTION_CALL -> {
+            // 函数名保留不变。SLEEP、LOAD_FILE 等是时间盲注与带外
+            // 注入的核心标志，若一并归一化将造成最危险一类攻击的漏报
+            for (AstNode child : node.mutableChildren()) {
+                normalizeInPlace(child);
+            }
+            return;
+        }
+
+        default -> { /* 表名、列名、运算符等结构性节点保持原样 */ }
+    }
+    for (AstNode child : node.mutableChildren()) {
+        normalizeInPlace(child);
+    }
+}
+\end{lstlisting}
+
+\subsection*{A.2\quad 结构指纹计算}
+
+\begin{lstlisting}[style=javastyle, caption={结构指纹的计算流程}]
+public ParseResult analyze(String sql, String endpoint) {
+    // 缓存命中则直接返回，使重复语句的检测开销降至可忽略水平
+    ParseResult cached = cache.getIfPresent(endpoint + "\0" + sql);
+    if (cached != null) return cached;
+
+    ParseResult result;
+    try {
+        AstNode ast        = new SqlParser(sql).parse();
+        AstNode normalized = AstNormalizer.normalize(ast);
+        String  canonical  = AstSerializer.serialize(normalized);
+        // 指纹绑定接口标识，防止跨接口复用合法结构以绕过检测
+        String  fingerprint = hash(endpoint + "|" + canonical);
+        result = new ParseResult(sql, endpoint, ast, normalized,
+                                 canonical, fingerprint, true, null);
+    } catch (RuntimeException e) {
+        // 解析异常降级：仍产出可用结果交由风险特征层判定。
+        // 解析失败绝不能成为绕过手段，故此处不放行
+        result = new ParseResult(sql, endpoint, null, null, sql,
+                                 hash(endpoint + "|" + sql), false,
+                                 e.getMessage());
+    }
+    cache.put(endpoint + "\0" + sql, result);
+    return result;
+}
+\end{lstlisting}
+
+% ------------------------------------------------------------
+\section{测试用例载荷}
+\setcounter{table}{0}
+
+\cref{tab:payload-list} 列出主要测试用例的攻击载荷。
+
+\begin{warnbox}
+\textbf{使用限制}\quad 以下载荷仅用于本地隔离环境中针对自建靶场的
+安全测试。任何针对未授权系统的使用均属违法行为。
+\end{warnbox}
+
+\begin{table}[htbp]
+\centering
+\caption{主要测试用例的攻击载荷}
+\label{tab:payload-list}
+\scriptsize
+\begin{tabular}{@{}l p{9.6cm}@{}}
+\toprule
+\textbf{用例} & \textbf{载荷} \\
+\midrule
+TC-01 & \code{username = admin' OR '1'='1' -{}-} \\
+TC-02 & \code{keyword = x\%' UNION SELECT id, id, username, CAST(password AS VARCHAR), role, created\_at FROM users -{}-} \\
+TC-03 & \code{id = 1' OR '1'='1} \\
+TC-04 & \code{keyword = x\%'/*!50000UNION*/SELECT ... FROM users -{}-} \\
+TC-05 & \code{id = 1' AND SLEEP(2) -{}-} \\
+TC-06 & \code{id = 1'; DROP TABLE notes\_backup; -{}-} \\
+TC-07 & \code{id = 1\%2527\%2520OR\%2520\%25271\%2527\%253D\%25271} \\
+TC-08 & \code{content = <img src=x onerror=alert(document.cookie)>} \\
+TC-09 & \code{content = <svg/onload=alert(1)>} \\
+TC-10 & \code{content = <a href="java\&\#115;cript:alert(1)">x</a>} \\
+TC-11 & \code{host = 127.0.0.1; cat /etc/passwd} \\
+TC-14 & \code{name = ../../../../etc/passwd} \\
+TC-19 & 头部改为 \code{\{"alg":"none"\}}，删除签名段并篡改角色声明 \\
+TC-22 & \code{url = http://127.0.0.1:8080/api/health} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ------------------------------------------------------------
+\section{项目成果清单}
+\setcounter{table}{0}
+
+\begin{table}[htbp]
+\centering
+\caption{项目交付成果}
+\label{tab:deliverables}
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{类别} & \textbf{成果} & \textbf{说明} \\
+\midrule
+\multirow{3}{*}{源代码}
+  & 后端六模块 & 约 1.09 万行 Java 代码 \\
+  & 前端应用   & 约 0.61 万行 Vue 代码 \\
+  & 测试脚本   & 单元测试与安全测试脚本 \\
+\midrule
+\multirow{2}{*}{文档}
+  & 设计文档   & 方案总览、架构设计、算法设计等六份 \\
+  & 本报告     & 综合设计报告 \\
+\midrule
+\multirow{2}{*}{其他}
+  & 代码仓库   & 含完整提交历史的公开仓库 \\
+  & 测试记录   & 三轮测试的完整执行结果 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ------------------------------------------------------------
+\section{合规声明}
+\setcounter{table}{0}
+
+\begin{warnbox}
+本项目所有攻击测试\textbf{均在本地隔离环境}中针对\textbf{自建靶场系统}执行，
+未对任何第三方系统实施未授权测试。
+
+靶场中的漏洞代码为教学目的\textbf{主动构造}，集中隔离于独立代码包并逐一
+加注警示注释，不随生产构建发布。反序列化类测试用例采用无害化载荷，
+不包含任何具备实际破坏能力的利用链。
+
+本项目严格遵守《中华人民共和国网络安全法》《中华人民共和国数据安全法》
+及相关法律法规，并参照国家标准 GB/T 20984 关于信息安全风险评估活动的
+规范要求执行。所有技术成果仅用于\textbf{安全防护研究与教学实践}。
+\end{warnbox}

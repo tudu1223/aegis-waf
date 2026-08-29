@@ -1,0 +1,114 @@
+% ============================================================
+%  中英文摘要
+% ============================================================
+\phantomsection
+\addcontentsline{toc}{section}{摘\quad 要}
+\section*{摘\quad 要}
+\markboth{摘要}{摘要}
+
+以 SQL 注入为代表的注入类漏洞长期位居 OWASP Top 10 首位。当前主流的
+Web 应用防火墙普遍采用基于正则表达式的特征匹配范式，其判定对象是请求载荷的
+\emph{文本形态}。然而攻击者可通过 URL 多重编码、HTML 实体编码、注释拆分、
+数据库方言内联注释以及大小写混淆等手段，在不改变载荷语义的前提下任意改变其
+文本形态，致使特征匹配长期陷于“新绕过手法出现—补充规则—再被绕过”的被动循环。
+
+针对上述问题，本文提出并实现了一种\textbf{基于抽象语法树结构指纹的语义检测方法}。
+该方法的核心观察是：注入攻击的本质目的是\emph{改变 SQL 的语义结构}，而语义结构由
+语法树的形状唯一决定，与树中字面量的具体取值以及语句的文本书写形式无关。据此，
+本文设计了“词法分析—语法分析—字面量归一化—规范化序列化—哈希”的处理流水线，
+将任意 SQL 语句映射为一个仅反映其语义结构的定长指纹。理论分析与实验证明，该指纹
+同时具备\emph{参数无关性}、\emph{形态无关性}与\emph{结构敏感性}三条性质，因而对
+编码混淆类绕过手法具有原理上的免疫能力。在指纹失配时，本文进一步提出基于
+\emph{路径签名多重集差分}的结构定位算法，以 $O(n)$ 的复杂度精确定位注入发生的
+语法树节点，并将差分结果映射为具有安全语义的攻击手法分类，为安全取证与可视化
+提供了确定性依据。
+
+在系统层面，本文设计了\textbf{安全网关与运行时应用自我保护（RASP）探针双层联动架构}。
+网关层工作于 HTTP 流量入口，其可见对象为请求参数文本，判定具有启发式性质；
+RASP 探针经字节码注入植入应用进程内部，钩取 JDBC 执行点，其可见对象为
+\emph{已完成拼接、即将送达数据库的真实语句}，因而可执行确定性的结构比对，并在攻击
+生效前的最后时刻予以阻断。两层通过统一的追踪标识关联，可完整还原“HTTP 请求—污染
+参数—真实 SQL—结构变异—处置结果“的攻击证据链。此外，本文以同样的”语义优先于文本”
+的思路实现了基于文档对象模型解析与三级白名单的跨站脚本净化机制，并配套设计了
+令牌桶与滑动窗口双重限流、带时间衰减的来源信誉评估，以及基于哈希链的防篡改审计日志。
+
+本文按照三轮测试法对系统进行了完整验证：第一轮在关闭防护并启用脆弱实现的条件下
+确认漏洞真实存在，第二轮在开启防护的条件下验证检出与拦截能力，第三轮在启用安全
+实现的条件下验证代码级修复的有效性。实验共设计 19 项测试用例，覆盖 OWASP Top 10
+（2021）的七个类别。结果表明：网关可判定类攻击的实时拦截率为 $12/12$；全部 19 项
+漏洞的代码级修复均验证有效；CVSS 评分不低于 7.0 的 18 项高危漏洞全部获得防护；
+审计日志哈希链完整性校验通过；检测引擎单元测试通过率为 $63/63$，平均检测时延为
+0.93~ms，显著优于 5~ms 的设计指标。对比实验进一步表明，本方法对数据库方言内联
+注释等可绕过传统正则规则集的载荷仍能稳定检出。
+
+\vspace{1.2em}
+\noindent\textbf{关键词}：\quad Web 应用防火墙；抽象语法树；结构指纹；语义检测；
+运行时应用自我保护；SQL 注入
+
+\vspace{2.2em}
+
+\phantomsection
+\addcontentsline{toc}{section}{Abstract}
+\section*{Abstract}
+
+Injection flaws, exemplified by SQL injection, have persistently ranked at the top
+of the OWASP Top 10. Mainstream Web Application Firewalls predominantly adopt a
+regular-expression-based signature matching paradigm, whose object of adjudication
+is the \emph{textual form} of a request payload. Adversaries, however, can
+arbitrarily alter this textual form---through multi-layer URL encoding, HTML entity
+encoding, comment splitting, dialect-specific inline comments, and case
+obfuscation---without altering the payload's semantics. Signature matching is
+therefore trapped in a reactive cycle: a novel evasion emerges, a rule is patched,
+and the rule is bypassed again.
+
+To address this problem, this work proposes and implements a \textbf{semantic
+detection method based on abstract syntax tree structural fingerprinting}. The
+central observation is that the essential objective of an injection attack is to
+\emph{alter the semantic structure of the SQL statement}, and that this structure
+is uniquely determined by the shape of the syntax tree---independent of the
+concrete values of its literals and of the statement's textual rendering.
+Accordingly, we design a pipeline of lexical analysis, syntactic analysis, literal
+normalization, canonical serialization, and hashing that maps an arbitrary SQL
+statement to a fixed-length fingerprint reflecting only its semantic structure.
+Both theoretical analysis and experiments establish that this fingerprint
+simultaneously satisfies \emph{parameter invariance}, \emph{form invariance}, and
+\emph{structure sensitivity}, thereby conferring principled immunity to
+encoding-based evasion. Upon fingerprint mismatch, we further propose a structural
+localization algorithm based on \emph{path-signature multiset differencing}, which
+identifies the precise syntax tree node at which injection occurred in $O(n)$ time
+and maps the resulting difference to security-semantic attack categories, providing
+a deterministic basis for forensics and visualization.
+
+At the system level, we design a \textbf{dual-layer architecture coupling a security
+gateway with a Runtime Application Self-Protection (RASP) agent}. The gateway
+operates at the HTTP ingress, where only parameter text is observable and adjudication
+is necessarily heuristic. The RASP agent, injected into the application process via
+bytecode instrumentation, hooks the JDBC execution point and observes the
+\emph{fully assembled statement about to reach the database}, thereby enabling
+deterministic structural comparison and interception at the last moment before the
+attack takes effect. The two layers are correlated by a unified trace identifier,
+reconstructing the complete evidence chain from HTTP request, through tainted
+parameter and actual SQL, to structural mutation and final verdict. Following the
+same principle of semantics over text, we implement a cross-site scripting
+sanitizer based on Document Object Model parsing with a three-tier allowlist, and
+complement the system with dual token-bucket and sliding-window rate limiting,
+time-decaying source reputation assessment, and a hash-chained tamper-evident audit log.
+
+The system is validated through a three-round testing methodology: the first round
+confirms vulnerability reproducibility with protection disabled and vulnerable
+implementations active; the second verifies detection and interception with
+protection enabled; the third validates code-level remediation with secure
+implementations active. Nineteen test cases were designed, spanning seven categories
+of the OWASP Top 10 (2021). Results show a real-time interception rate of $12/12$
+for gateway-adjudicable attacks; code-level remediation verified effective for all
+19 vulnerabilities; protection achieved for all 18 high-severity vulnerabilities with
+CVSS $\geq 7.0$; successful integrity verification of the audit hash chain; a unit
+test pass rate of $63/63$ for the detection engine; and a mean detection latency of
+0.93~ms, substantially outperforming the 5~ms design target. Comparative experiments
+further demonstrate stable detection of payloads employing dialect-specific inline
+comments, which are capable of evading conventional regular-expression rule sets.
+
+\vspace{1.2em}
+\noindent\textbf{Keywords}:\quad Web Application Firewall; Abstract Syntax Tree;
+Structural Fingerprint; Semantic Detection; Runtime Application Self-Protection;
+SQL Injection

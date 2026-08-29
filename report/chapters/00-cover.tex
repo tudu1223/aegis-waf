@@ -1,0 +1,76 @@
+% ============================================================
+%  封面
+% ============================================================
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+
+\vspace*{0.6cm}
+
+{\Large\sffamily\bfseries 《系统安全综合设计与训练》}\\[4pt]
+{\large\sffamily 综合设计报告}
+
+\vspace{0.5cm}
+{\color{rulegray!70}\rule{0.72\textwidth}{0.6pt}}
+
+\vspace{2.0cm}
+
+% ---------- 标识图形：盾牌与语法树 ----------
+\begin{tikzpicture}[scale=1.0]
+  % 盾牌轮廓
+  \fill[aegisblue!88]
+    (0,1.55) -- (-1.16,0.98) -- (-1.16,-0.32)
+    .. controls (-1.16,-1.26) and (-0.62,-1.92) .. (0,-2.10)
+    .. controls (0.62,-1.92) and (1.16,-1.26) .. (1.16,-0.32)
+    -- (1.16,0.98) -- cycle;
+  \fill[aegisind!80, opacity=0.55]
+    (0,1.55) -- (1.16,0.98) -- (1.16,-0.32)
+    .. controls (1.16,-1.26) and (0.62,-1.92) .. (0,-2.10) -- cycle;
+
+  % 语法树：根节点分出两个子节点，右侧标红代表检出的注入结构
+  \draw[white, line width=1.5pt] (0,0.62) -- (0,0.16);
+  \draw[white, line width=1.5pt] (0,0.16) .. controls (0,-0.20) .. (-0.50,-0.52);
+  \draw[white, line width=1.5pt] (0,0.16) .. controls (0,-0.20) .. (0.50,-0.52);
+  \fill[white] (0,0.62) circle (0.19);
+  \fill[white] (-0.50,-0.60) circle (0.17);
+  \fill[aegisred!85] (0.50,-0.60) circle (0.17);
+  \fill[aegisred!85, opacity=0.30] (0.50,-0.60) circle (0.31);
+\end{tikzpicture}
+
+\vspace{1.1cm}
+
+{\Huge\sffamily\bfseries AEGIS}
+
+\vspace{0.35cm}
+
+{\LARGE\sffamily\bfseries 基于抽象语法树结构指纹的}\\[8pt]
+{\LARGE\sffamily\bfseries Web 攻击语义检测平台}
+
+\vspace{0.5cm}
+
+{\large\itshape Semantic Web Attack Detection Platform\\[2pt]
+via SQL Abstract Syntax Tree Structural Fingerprinting}
+
+\vspace{1.6cm}
+
+% ---------- 信息表 ----------
+{\large
+\begin{tabular}{@{}r@{\quad}l@{}}
+  \sffamily 课程名称 & 系统安全综合设计与训练 \\[5pt]
+  \sffamily 课程代码 & 60025127 \\[5pt]
+  \sffamily 选题类别 & 自拟题目（应用安全类） \\[5pt]
+  \sffamily 适用专业 & 网络空间安全 \\[5pt]
+  \sffamily 完成形式 & 独立完成 \\[5pt]
+  \sffamily 学\hspace{2em}号 & \underline{\hspace{4.2cm}} \\[5pt]
+  \sffamily 姓\hspace{2em}名 & \underline{\hspace{4.2cm}} \\[5pt]
+  \sffamily 指导教师 & \underline{\hspace{4.2cm}} \\
+\end{tabular}}
+
+\vfill
+
+{\color{rulegray!70}\rule{0.72\textwidth}{0.6pt}}\\[6pt]
+{\small\sffamily\color{aegisgray} 计算机与信息学院\quad 网络空间安全系}\\[3pt]
+{\small\sffamily\color{aegisgray} 2026 年}
+
+\vspace{0.4cm}
+\end{titlepage}

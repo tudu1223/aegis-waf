@@ -1,0 +1,257 @@
+% ============================================================
+%  第 6 章  系统实现
+% ============================================================
+\section{系统实现}
+\label{sec:implementation}
+
+\subsection{开发环境与规模}
+
+系统的开发环境与代码规模统计见 \cref{tab:dev-env} 与 \cref{tab:loc}。
+后端代码约 1.09 万行，前端约 0.61 万行，合计约 1.70 万行。
+
+\begin{table}[htbp]
+\centering
+\caption{开发环境与技术选型}
+\label{tab:dev-env}
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{层次} & \textbf{选型} & \textbf{选型理由} \\
+\midrule
+运行时     & JDK 17 (LTS)      & 支持记录类型与模式匹配，简化数据建模 \\
+后端框架   & Spring Boot 3.2   & 生态成熟，符合课程推荐技术栈 \\
+字节码注入 & Byte Buddy 1.14   & Java Agent 事实标准，接口友好 \\
+文档解析   & jsoup 1.17        & 符合 HTML 规范的文档对象模型实现 \\
+本地缓存   & Caffeine 3.1      & 高性能，支持基于时间的过期策略 \\
+持久化     & H2 / MySQL 8      & 开发期零配置，演示期切换关系数据库 \\
+前端框架   & Vue 3.4 + Vite 5  & 符合课程推荐技术栈 \\
+图可视化   & AntV G6 4.8       & 树布局能力完善，支持自定义节点 \\
+统计图表   & ECharts 5.5       & 图表类型丰富，渲染性能良好 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{各模块代码规模统计}
+\label{tab:loc}
+\small
+\begin{tabular}{@{}l r r l@{}}
+\toprule
+\textbf{模块} & \textbf{文件数} & \textbf{代码行数} & \textbf{主要内容} \\
+\midrule
+\code{aegis-core}    & 24 & 4\,180 & 词法、语法、指纹、差分、净化、限流 \\
+\code{aegis-agent}   &  8 & 1\,240 & 字节码注入、执行钩子、异步上报 \\
+\code{aegis-gateway} &  7 & 1\,360 & 反向代理、过滤器链、策略同步 \\
+\code{aegis-console} & 13 & 2\,020 & 事件汇聚、哈希链、统计、推送 \\
+\code{vuln-target}   & 14 & 2\,130 & 受控靶场与双实现对照 \\
+\code{aegis-web}     & 16 & 6\,124 & 可视化界面与交互 \\
+\midrule
+\textbf{合计}        & \textbf{82} & \textbf{17\,054} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{检测引擎的实现}
+
+\subsubsection{词法分析中的注释粘合}
+
+\cref{subsec:parsing} 指出词法分析需处理方言可执行注释。实现中还遇到一个
+更微妙的情形：攻击载荷 \code{UNI/**/ON} 中，注释位于\emph{关键字内部}。
+标准词法器会将其切分为两个独立标识符，导致 \code{UNION} 语义丢失。
+
+严格而言，多数数据库会拒绝执行这一形式。但安全检测应采取\textbf{最保守假设}：
+不同数据库、连接池与对象关系映射中间件对注释的预处理行为存在差异，
+某些组合会先剥离注释再执行，使关键字复原生效。本文因而在词法阶段实施
+\emph{注释边界粘合}：当注释的剥离位置两侧均为标识符字符时，尝试拼接并
+检查结果是否构成关键字，若是则完成粘合并标记为混淆来源。
+
+\subsubsection{网关层参数判定的双探针法}
+
+网关层需判断一个孤立的参数值是否具备注入意图，而它并不知道该值将被拼接
+到何种上下文。一个朴素做法是将参数裸拼进模板语句再解析，但这会产生严重误报：
+普通文本 \code{hello world} 拼成 \code{WHERE x = hello world} 后无法解析为
+单一表达式，被误判为堆叠查询。
+
+本文提出\emph{双探针结构差分法}：将参数值作为\textbf{字符串字面量}注入探针
+模板，模拟真实的拼接场景：
+\begin{equation*}
+\text{探针} = \texttt{SELECT * FROM t WHERE c = '}\ \langle \text{参数值} \rangle\ \texttt{'}
+\end{equation*}
+若参数是普通文本，它始终被包裹在引号内，探针结构与基准完全一致；
+唯有当参数含有能够\emph{闭合引号并逃逸出字面量上下文}的内容时
+（这正是注入的本质），探针才会产生额外的语法结构。
+
+此外，对以数字开头的参数额外启用数值上下文探针，以覆盖
+\code{1 OR 1=1} 这类无需闭合引号的数值型注入。该探针不对自由文本启用，
+以避免前述的解析噪声。
+
+\begin{keybox}
+这一设计体现了一个通用原则：\textbf{检测方法的构造须与被检测场景的
+真实语义保持一致}。脱离实际拼接上下文的\zh{裸拼探测}看似直接，
+实则引入了原本不存在的解析歧义。
+\end{keybox}
+
+\subsection{RASP 探针的实现}
+
+\subsubsection{钩取点选择}
+
+探针通过 Java Agent 机制在类加载时改写字节码。钩取点的选择遵循
+\emph{覆盖完整、位置唯一}的原则，见 \cref{tab:hook-points}。
+
+\begin{table}[htbp]
+\centering
+\caption{RASP 探针的钩取点设计}
+\label{tab:hook-points}
+\small
+\begin{tabular}{@{}l l p{5.0cm}@{}}
+\toprule
+\textbf{钩取目标} & \textbf{对应威胁} & \textbf{选择理由} \\
+\midrule
+数据库语句执行接口 & T-01 & 所有查询的必经之路，可获取完整语句 \\
+进程构建器启动方法 & T-07 & 命令执行的统一出口，覆盖两类调用形式 \\
+过滤器链入口       & ---  & 提取网关注入的追踪标识 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+选择进程构建器而非运行时执行方法，是因为后者的所有重载最终均委托给前者，
+在此设钩可避免遗漏。
+
+\subsubsection{两处工程约束}
+
+字节码注入的实现有两处约束值得记录，它们在开发中均造成了实际问题。
+
+\paragraph{探针依赖必须极简。}
+探针被注入宿主应用的虚拟机中，其携带的任何日志实现都可能与宿主的日志框架
+冲突。本文初次构建时因探针包中打包了日志门面，导致宿主应用检测到竞争的
+日志工厂而拒绝启动。修复方式是在打包阶段显式排除全部日志门面与实现。
+
+\paragraph{拦截异常不可被抑制。}
+字节码注入框架提供了异常抑制选项，用于防止注入代码的异常影响宿主。
+但若对拦截逻辑启用该选项，主动抛出的安全异常会被一并吞掉，
+导致\emph{能检出却无法阻断}。正确做法是关闭注入层的抑制，
+转由检测方法内部区分\zh{意外异常}与\zh{拦截决策}，
+前者吞掉放行，后者向上传播。
+
+\subsection{可视化界面的实现}
+
+\subsubsection{设计取向}
+
+界面设计以\emph{信息密度与可读性的平衡}为目标，采用浅色基调、
+克制的动效与统一的语义配色。所有指标数字采用等宽字体并启用表格数字特性，
+保证数值变化时字符宽度稳定——这一细节对监控类界面的专业观感影响显著。
+
+动效遵循\zh{服务于信息}的原则：仅在状态变化时使用，
+如新事件的侧向滑入、注入节点的脉冲提示、指标数值的滚动过渡。
+不设置无信息量的常驻装饰动画。
+
+\subsubsection{语法树差分的渲染}
+
+语法树可视化是界面的技术核心。后端将差分结果导出为树形数据，
+其中每个节点携带 \code{status} 字段标识其差分状态；前端据此渲染：
+正常结构为冷色调，注入结构为警示红并附带脉冲光晕，通向注入节点的连线
+同步标红，形成完整的\zh{攻击路径}视觉。
+
+实现中的一处细节是视图适配的时机。若在容器尺寸尚未稳定时执行自适应缩放，
+会依据错误的画布尺寸计算比例，导致节点溢出可视区域。本文将适配推迟至
+布局完成后的下一帧执行，并对缩放比例设置上下限，避免节点稀少时被过度放大。
+
+\subsection{受控靶场的实现}
+
+\subsubsection{双实现对照结构}
+
+靶场为每个漏洞提供脆弱与安全两份实现，通过运行时开关切换。
+这一结构的价值在于：使\zh{漏洞修复证明}直接体现为同一业务功能的
+两份代码对照，而非依赖外部文档描述。\cref{tab:dual-impl} 以 SQL 注入
+为例展示对照关系。
+
+\begin{table}[htbp]
+\centering
+\caption{脆弱实现与安全实现的代码对照示例}
+\label{tab:dual-impl}
+\footnotesize
+\begin{tabular}{@{}p{5.4cm} p{5.4cm}@{}}
+\toprule
+\textbf{脆弱实现（\code{vuln} 包）} & \textbf{安全实现（\code{safe} 包）} \\
+\midrule
+\vspace{-2mm}
+\begin{lstlisting}[style=javastyle,numbers=none,frame=none,
+                   backgroundcolor=\color{white},xleftmargin=0pt]
+// [VULN-01] 危险写法
+String sql =
+  "SELECT * FROM users WHERE "
+  + "username='" + username
+  + "' AND password='"
+  + md5(password) + "'";
+jdbc.query(sql, mapper);
+\end{lstlisting}
+&
+\vspace{-2mm}
+\begin{lstlisting}[style=javastyle,numbers=none,frame=none,
+                   backgroundcolor=\color{white},xleftmargin=0pt]
+// [FIX-01] 参数化查询
+String sql =
+  "SELECT * FROM users WHERE "
+  + "username = ?";
+jdbc.query(sql,
+  ps -> ps.setString(1, username),
+  mapper);
+\end{lstlisting}
+\\
+\midrule
+数据混入 SQL 结构，攻击者可通过闭合引号改变查询语义 &
+结构固定，占位符绑定的值始终被当作纯数据处理 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{合规性措施}
+
+靶场包含主动构造的漏洞，须防止误用。除代码隔离与警示注释外，
+本文对反序列化类测试采用无害化载荷，不引入任何具备实际破坏能力的
+利用链；靶场配置默认仅监听本地回环地址；相关说明在项目文档与
+代码注释中均予以显著标注。
+
+\subsection{系统界面}
+
+系统的可视化界面包含五个功能页面：态势总览呈现全局安全态势与实时事件流；
+威胁事件提供多维筛选与审计链校验；语法树分析展示单次攻击的完整取证信息；
+基线管理支持结构基线的审核与维护；攻防演练台内置测试载荷库，
+支持单发与批量演练。
+
+其中语法树分析页面是技术展示的核心，其信息组织如
+\cref{fig:ui-analysis-layout} 所示。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=3mm]
+\node[block, minimum width=112mm, minimum height=7mm, fill=aegisgray!5,
+      draw=aegisgray!50] (head)
+  {事件标识 $\cdot$ 追踪标识 $\cdot$ 严重级别 $\cdot$ 风险评分 $\cdot$ 结构相似度 $\cdot$ 处置结果};
+
+\node[block, below=of head, minimum width=70mm, minimum height=32mm,
+      fill=aegisblue!5] (tree)
+  {\textbf{语法树结构差分可视化}\\[3pt]
+   {\scriptsize 正常结构以冷色渲染}\\[-1pt]
+   {\scriptsize 注入结构以警示色高亮并附脉冲提示}\\[-1pt]
+   {\scriptsize 支持缩放与拖拽以查看细节}};
+
+\node[block, right=3mm of tree, minimum width=38mm, minimum height=10mm]
+  (mut) {变异节点清单\\[-2pt]{\scriptsize 分类 $\cdot$ 路径 $\cdot$ 说明}};
+\node[block, below=3mm of mut, minimum width=38mm, minimum height=9mm]
+  (evi) {判定依据\\[-2pt]{\scriptsize 逐条列出证据}};
+\node[block, below=3mm of evi, minimum width=38mm, minimum height=9mm]
+  (fp) {结构指纹对照\\[-2pt]{\scriptsize 基线与实际}};
+
+\node[block, below=3mm of tree, minimum width=112mm, minimum height=8mm,
+      fill=aegisteal!5, draw=aegisteal!55, anchor=north west,
+      xshift=0mm] (chain) at ($(tree.south west)+(0,-3mm)$)
+  {\textbf{攻击证据链}\quad{\scriptsize 网关层事件 $\rightarrow$ 探针层事件，按追踪标识关联}};
+
+\node[block, below=3mm of chain, minimum width=112mm, minimum height=9mm]
+  (sql) {\textbf{探针捕获的真实语句}\quad{\scriptsize 关键字与危险函数语法高亮}};
+\end{tikzpicture}
+\caption{语法树分析页面的信息组织}
+\label{fig:ui-analysis-layout}
+\end{figure}

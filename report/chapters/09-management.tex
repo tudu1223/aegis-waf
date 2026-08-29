@@ -1,0 +1,138 @@
+% ============================================================
+%  第 8 章  项目管理
+% ============================================================
+\section{项目管理}
+\label{sec:management}
+
+\subsection{开发流程与进度安排}
+
+项目按课程实践指导书规定的四个阶段推进，实际执行的日程安排见
+\cref{fig:gantt}。图中标注了两个关键节点：技术风险验证前置于第三日完成，
+核心算法在第六日形成可验证的实现。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=7.6mm, y=-6.2mm]
+
+% ---- 时间轴 ----
+\foreach \d in {1,...,14}
+  \node[font=\scriptsize, color=aegisgray] at (\d,-0.6) {D\d};
+\draw[rulegray!55, line width=0.4pt] (0.5,-0.15) -- (14.5,-0.15);
+
+% ---- 阶段背景 ----
+\fill[aegisblue!5]  (0.6,0.3) rectangle (4.4,1.7);
+\fill[aegisteal!5]  (4.6,0.3) rectangle (11.4,7.7);
+\fill[aegisamber!5] (11.6,0.3) rectangle (14.4,9.7);
+
+% ---- 任务条 ----
+\newcommand{\task}[5]{
+  \fill[#5, rounded corners=1.2pt] (#1-0.38,#3-0.30) rectangle (#2+0.38,#3+0.30);
+  \node[anchor=west, font=\scriptsize] at (14.8,#3) {#4};
+}
+
+\task{1}{2}{1}{需求分析与威胁建模}{aegisblue!55}
+\task{3}{4}{2}{架构设计与技术验证}{aegisblue!55}
+\task{5}{6}{3}{检测引擎内核实现}{aegisteal!58}
+\task{7}{7}{4}{语义净化与辅助检测}{aegisteal!58}
+\task{8}{8}{5}{受控靶场构建}{aegisteal!58}
+\task{9}{9}{6}{RASP 探针实现}{aegisteal!58}
+\task{10}{10}{7}{网关与控制台服务}{aegisteal!58}
+\task{11}{12}{8}{可视化界面实现}{aegisind!52}
+\task{13}{13}{9}{安全测试与缺陷修复}{aegisamber!58}
+\task{14}{14}{10}{报告撰写与成果整理}{aegisamber!58}
+
+% ---- 里程碑 ----
+\node[star, star points=5, star point ratio=2.2, fill=aegisred!85,
+      inner sep=1.1pt] at (4,2) {};
+\node[star, star points=5, star point ratio=2.2, fill=aegisred!85,
+      inner sep=1.1pt] at (6,3) {};
+\node[font=\scriptsize, color=aegisred, anchor=west] at (14.8,10.9)
+  {\ding{72} 关键里程碑};
+
+% ---- 阶段标注 ----
+\node[font=\scriptsize\bfseries, color=aegisblue] at (2.5,-1.5) {设计阶段};
+\node[font=\scriptsize\bfseries, color=aegisteal] at (8.0,-1.5) {实现阶段};
+\node[font=\scriptsize\bfseries, color=aegisamber] at (13.0,-1.5) {验证阶段};
+
+\end{tikzpicture}
+\caption{项目开发进度甘特图}
+\label{fig:gantt}
+\end{figure}
+
+\subsection{风险管理}
+
+项目启动时识别了六项风险并预设应对措施，实际发生情况见
+\cref{tab:risk-register}。其中字节码注入的技术不确定性被判定为最高风险，
+故将其验证前置至第三日，并预设了退化方案。
+
+\begin{table}[htbp]
+\centering
+\caption{风险登记表与实际发生情况}
+\label{tab:risk-register}
+\footnotesize
+\begin{tabular}{@{}l c c p{3.6cm} l@{}}
+\toprule
+\textbf{风险项} & \textbf{概率} & \textbf{影响} & \textbf{应对措施} & \textbf{实际情况} \\
+\midrule
+字节码注入受阻     & 中 & 高 & 退化为数据访问层显式埋点 & 未发生，一次验证通过 \\
+探针依赖冲突       & 中 & 高 & 打包时排除日志实现       & \textbf{发生并修复} \\
+语法解析方言差异   & 高 & 中 & 容错解析加词法层降级     & 发生，按预案处理 \\
+图渲染性能不足     & 低 & 中 & 限制节点数并支持折叠     & 未发生 \\
+进度延误           & 中 & 高 & 按优先级裁剪增强功能     & 未发生 \\
+误报率超标         & 中 & 中 & 提高相似度容差与接口豁免 & \textbf{发生并修复} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{工时统计}
+
+各阶段的工时投入见 \cref{fig:effort}。实现阶段占比最高，
+其中检测引擎内核与可视化界面各占实现工时的三成左右。
+测试与缺陷修复的工时占比达 18\%，这一比例反映了安全类项目对验证的高要求。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=11.0cm, height=5.0cm,
+  axis lines=left,
+  xbar stacked,
+  bar width=17pt,
+  xlabel={工时占比 (\%)},
+  symbolic y coords={{工时分布}},
+  ytick=\empty,
+  xmin=0, xmax=100,
+  legend style={at={(0.5,-0.42)}, anchor=north, legend columns=3,
+                font=\scriptsize},
+  xmajorgrids=true,
+  axis line style={rulegray!85},
+  nodes near coords,
+  nodes near coords style={font=\scriptsize, color=white},
+  every node near coord/.append style={anchor=center}
+]
+\addplot[fill=aegisblue!60, draw=aegisblue!85] coordinates {(14,{工时分布})};
+\addplot[fill=aegisteal!60, draw=aegisteal!85] coordinates {(38,{工时分布})};
+\addplot[fill=aegisind!55, draw=aegisind!80]  coordinates {(20,{工时分布})};
+\addplot[fill=aegisamber!60, draw=aegisamber!85] coordinates {(18,{工时分布})};
+\addplot[fill=aegisgray!45, draw=aegisgray!75] coordinates {(10,{工时分布})};
+\legend{需求与设计, 后端实现, 前端实现, 测试与修复, 文档撰写}
+\end{axis}
+\end{tikzpicture}
+\caption{各阶段工时投入占比}
+\label{fig:effort}
+\end{figure}
+
+\subsection{版本控制与过程留痕}
+
+项目全程使用 Git 进行版本管理，遵循约定式提交规范，提交信息按
+\code{feat}、\code{fix}、\code{docs}、\code{test}、\code{chore} 分类。
+代码托管于公开仓库，包含完整的提交历史、设计文档与测试脚本，
+构成可追溯的开发过程记录。
+
+\subsection{质量保障措施}
+
+项目采取三项质量保障措施：其一，检测引擎的每项算法均配套单元测试，
+且测试用例直接对应算法的形式化性质（如指纹的三条性质各有对应测试）；
+其二，每次发现缺陷后补充相应的回归测试，防止问题重现——
+本文的命令注入误报修复即配套新增了 12 项测试；其三，
+以三轮测试法进行端到端验证，避免单点验证的片面性。

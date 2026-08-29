@@ -1,0 +1,17 @@
+build/
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
+# 编译产物中的成品报告随仓库提供，便于直接查阅
+!AEGIS-综合设计报告.pdf

@@ -1,0 +1,334 @@
+% ============================================================
+%  第 2 章  需求分析
+% ============================================================
+\section{需求分析}
+\label{sec:requirements}
+
+\subsection{系统目标与设计约束}
+
+本系统的总体目标是：在\emph{不修改被保护应用源代码}的前提下，对 Web 应用面临的
+注入类攻击实施高准确率的实时检测与阻断，并为安全运营提供具备结构级定位能力的
+取证依据。
+
+围绕这一目标，本文明确以下四项设计约束，它们贯穿后续的架构与算法设计。
+
+\begin{keybox}
+\textbf{约束 C1（判定依据的正交性）}\quad 检测依据须对攻击者可自由操纵的维度
+（文本形态）不敏感，而对攻击者必须改变的维度（语义结构）高度敏感。
+
+\textbf{约束 C2（部署的非侵入性）}\quad 防护能力的植入不得要求修改应用源码或
+业务逻辑，以适应存量系统与第三方组件的改造限制。
+
+\textbf{约束 C3（失效安全）}\quad 检测组件自身的任何异常均不得阻断正常业务流量，
+即在可用性与检测完整性冲突时优先保障可用性。
+
+\textbf{约束 C4（判定的可解释性）}\quad 每一次拦截决策须能向安全运营人员说明
+“依据何种结构证据判定为攻击”，而非仅输出一个置信度分值。
+\end{keybox}
+
+\subsection{功能性需求}
+
+依据上述目标，本文梳理出 20 项功能性需求，按所属子系统归类列于
+\cref{tab:functional-req}。优先级中 P0 表示核心功能，P1 表示重要功能，
+P2 表示增强功能。
+
+\begin{table}[htbp]
+\centering
+\caption{功能性需求清单}
+\label{tab:functional-req}
+\footnotesize
+\begin{tabular}{@{}l l p{7.0cm} c@{}}
+\toprule
+\textbf{编号} & \textbf{子系统} & \textbf{需求描述} & \textbf{优先级} \\
+\midrule
+FR-01 & 网关 & 反向代理转发，支持常见 HTTP 方法与表单、JSON 载荷 & P0 \\
+FR-02 & 网关 & 载荷多重归一化：URL、HTML 实体、Unicode 解码至不动点 & P0 \\
+FR-03 & 网关 & 请求参数的攻击意图启发式判定 & P0 \\
+FR-04 & 网关 & 令牌桶与滑动窗口双重速率限制 & P0 \\
+FR-05 & 网关 & 来源信誉评估与动态封禁，评分随时间衰减 & P1 \\
+FR-06 & 网关 & 注入追踪标识，实现与探针层的事件关联 & P0 \\
+\midrule
+FR-07 & 引擎 & SQL 词法分析，消解注释拆分与大小写混淆 & P0 \\
+FR-08 & 引擎 & 递归下降语法分析，构建抽象语法树 & P0 \\
+FR-09 & 引擎 & 字面量归一化与规范化序列化 & P0 \\
+FR-10 & 引擎 & 结构指纹计算，指纹与接口标识绑定 & P0 \\
+FR-11 & 引擎 & 路径签名多重集差分与变异节点语义标注 & P0 \\
+FR-12 & 引擎 & 风险特征检测，支撑无基线场景的冷启动判定 & P0 \\
+FR-13 & 引擎 & 基于文档对象模型解析的跨站脚本净化 & P0 \\
+FR-14 & 引擎 & 路径穿越与命令注入检测 & P1 \\
+\midrule
+FR-15 & 探针 & 字节码注入，钩取数据库执行与命令执行入口 & P0 \\
+FR-16 & 探针 & 在语句送达数据库前完成结构判定与阻断 & P0 \\
+FR-17 & 探针 & 基线自动学习，按结构指纹去重 & P1 \\
+\midrule
+FR-18 & 控制台 & 事件汇聚、哈希链审计与完整性校验 & P0 \\
+FR-19 & 控制台 & 统计聚合与实时推送 & P0 \\
+FR-20 & 前端 & 语法树差分可视化与攻击证据链呈现 & P0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{非功能性需求}
+
+\cref{tab:nonfunctional-req} 给出量化的非功能性指标。其中检测时延指标依据
+如下考量确定：Web 请求的端到端时延通常在数十毫秒量级，安全检测作为旁路环节，
+其开销应控制在总时延的 10\% 以内方可认为对用户体验无感知，故设定 5~ms 的上限。
+
+\begin{table}[htbp]
+\centering
+\caption{非功能性需求指标}
+\label{tab:nonfunctional-req}
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{编号} & \textbf{属性} & \textbf{指标} \\
+\midrule
+NFR-01 & 检测时延   & 单次结构检测的平均时延不高于 5~ms \\
+NFR-02 & 吞吐能力   & 单实例不低于 500~QPS（本地验证环境） \\
+NFR-03 & 误报率     & 正常业务流量的误报率低于 1\% \\
+NFR-04 & 漏报率     & 对测试载荷集的漏报率为 0 \\
+NFR-05 & 呈现时延   & 攻击发生至可视化界面呈现不超过 500~ms \\
+NFR-06 & 可用性     & 检测组件异常时降级放行，不阻断业务 \\
+NFR-07 & 可维护性   & 检测引擎单元测试行覆盖率不低于 70\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{威胁建模}
+
+\subsubsection{数据流与信任边界}
+
+威胁建模的第一步是识别系统的数据流与信任边界。\cref{fig:dfd} 给出了本系统的
+数据流图。图中虚线表示信任边界，跨越边界的数据流是威胁分析的重点对象。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=8mm]
+
+% ---- 外部实体 ----
+\node[block, fill=aegisred!5, draw=aegisred!60, minimum width=24mm]
+  (attacker) {外部攻击者};
+\node[block, fill=aegisteal!6, draw=aegisteal!60, minimum width=24mm,
+      right=40mm of attacker] (admin) {运营管理员};
+
+% ---- 边界 1 ----
+\draw[dashed, rulegray, line width=0.7pt]
+  ($(attacker.south west)+(-0.8,-0.5)$) -- ($(admin.south east)+(0.8,-0.5)$)
+  node[midway, above, lbl, fill=white, inner sep=1.5pt]
+  {信任边界 T1：公网 $\vert$ 内部服务};
+
+% ---- 处理节点 ----
+\node[block, below=12mm of attacker, minimum width=30mm]
+  (gateway) {安全网关\\[-1pt]\scriptsize 参数检测 $\cdot$ 限流};
+\node[block, below=12mm of admin, minimum width=30mm]
+  (console) {控制台服务\\[-1pt]\scriptsize 事件汇聚 $\cdot$ 审计};
+
+% ---- 边界 2 ----
+\draw[dashed, rulegray, line width=0.7pt]
+  ($(gateway.south west)+(-0.8,-0.5)$) -- ($(console.south east)+(0.8,-0.5)$)
+  node[midway, above, lbl, fill=white, inner sep=1.5pt]
+  {信任边界 T2：防护层 $\vert$ 应用层};
+
+\node[block, below=12mm of gateway, minimum width=30mm] (app)
+  {业务应用\\[-1pt]\scriptsize 内嵌 RASP 探针};
+\node[block, below=12mm of console, minimum width=30mm] (store)
+  {事件存储\\[-1pt]\scriptsize 哈希链审计日志};
+
+% ---- 边界 3 ----
+\draw[dashed, rulegray, line width=0.7pt]
+  ($(app.south west)+(-0.8,-0.5)$) -- ($(store.south east)+(0.8,-0.5)$)
+  node[midway, above, lbl, fill=white, inner sep=1.5pt]
+  {信任边界 T3：应用层 $\vert$ 数据层};
+
+\node[block, below=12mm of app, minimum width=26mm] (db) {数据库};
+
+% ---- 数据流 ----
+\draw[flowred] (attacker) -- node[right, lbl, xshift=1pt] {\textcircled{\scriptsize 1} 攻击载荷} (gateway);
+\draw[flow] (admin) -- node[right, lbl, xshift=1pt] {\textcircled{\scriptsize 2} 管理操作} (console);
+\draw[flow] (gateway) -- node[right, lbl, xshift=1pt] {\textcircled{\scriptsize 3} 转发 + 追踪标识} (app);
+\draw[flow] (app) -- node[right, lbl, xshift=1pt] {\textcircled{\scriptsize 4} SQL 语句} (db);
+\draw[flow] (console) -- node[right, lbl, xshift=1pt] {\textcircled{\scriptsize 5} 持久化} (store);
+\draw[flow] (gateway.west) -- ++(-0.75,0) |- ($(store.west)+(-2.4,0)$) -- (store.west);
+\node[lbl, left=1mm of gateway.west, yshift=-4mm] {\textcircled{\scriptsize 6} 事件上报};
+
+\end{tikzpicture}
+\caption{系统数据流图与信任边界划分}
+\label{fig:dfd}
+\end{figure}
+
+\subsubsection{STRIDE 威胁识别}
+
+本文采用 STRIDE 方法\cite{shostack2014threat}对跨越信任边界的数据流进行系统性
+威胁识别。STRIDE 是六类威胁英文首字母的缩写：假冒（Spoofing）、篡改（Tampering）、
+抵赖（Repudiation）、信息泄露（Information Disclosure）、拒绝服务
+（Denial of Service）与权限提升（Elevation of Privilege）。
+
+\subsubsection{DREAD 风险定级}
+
+对识别出的威胁，本文采用 DREAD 模型进行量化定级。该模型从潜在危害（Damage）、
+可复现性（Reproducibility）、可利用性（Exploitability）、受影响用户范围
+（Affected Users）与可发现性（Discoverability）五个维度各赋 $0\sim10$ 分，
+取算术平均作为综合风险分。参照 CVSS 3.1 的分级惯例\cite{first2019cvss}，
+综合分不低于 7.0 者判定为高危，须在设计阶段给出明确的缓解措施并在测试阶段
+提供修复证明。
+
+\cref{tab:threat-model} 给出完整的威胁清单与缓解措施映射。
+
+\begin{table}[htbp]
+\centering
+\caption{STRIDE 威胁清单、DREAD 定级与缓解措施}
+\label{tab:threat-model}
+\scriptsize
+\begin{threeparttable}
+\begin{tabular}{@{}l c p{3.2cm} c c p{4.2cm}@{}}
+\toprule
+\textbf{编号} & \textbf{类型} & \textbf{威胁描述} & \textbf{DREAD} &
+\textbf{等级} & \textbf{缓解措施} \\
+\midrule
+T-01 & T & SQL 注入篡改查询逻辑 & 9.0 & 严重 &
+  语法树结构指纹 + 探针确定性判定 + 参数化查询 \\
+T-02 & T & 跨站脚本注入恶意脚本 & 8.0 & 高 &
+  文档对象模型解析 + 三级白名单净化 \\
+T-03 & S & 令牌伪造与算法混淆 & 8.0 & 高 &
+  强制签名算法白名单，拒绝无签名令牌 \\
+T-04 & E & 水平与垂直越权访问 & 8.0 & 高 &
+  资源属主强校验 + 基于角色的访问控制 \\
+T-05 & I & 路径穿越读取任意文件 & 7.5 & 高 &
+  路径规范化后的根目录前缀判定 \\
+T-06 & D & 高频请求耗尽服务能力 & 7.0 & 高 &
+  令牌桶 + 滑动窗口 + 来源信誉封禁 \\
+T-07 & T & 命令注入执行系统指令 & 9.0 & 严重 &
+  探针钩取执行点 + 参数数组化调用 \\
+T-08 & I & 异常信息泄露内部结构 & 6.0 & 中 &
+  全局异常处理，对外返回通用提示 \\
+T-09 & R & 攻击者否认其攻击行为 & 5.0 & 中 &
+  哈希链审计日志 + 全链路追踪标识 \\
+T-10 & I & 服务端请求伪造探测内网 & 7.0 & 高 &
+  域名解析后的地址判定 + 内网网段拒绝 \\
+T-11 & T & 不安全反序列化 & 8.0 & 高 &
+  禁用原生反序列化，改用类型白名单 \\
+T-12 & S & 编码混淆绕过检测 & 8.0 & 高 &
+  \textbf{多重归一化 + 语法结构判定（核心）} \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]\footnotesize
+\item 类型列缩写：S 假冒，T 篡改，R 抵赖，I 信息泄露，D 拒绝服务，E 权限提升。
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\subsubsection{威胁分布分析}
+
+\cref{fig:threat-dist} 从两个维度呈现威胁的分布特征。左图显示，篡改类威胁
+（T-01、T-02、T-07、T-11）数量最多，共 4 项，占威胁总数的三分之一，这与注入类
+攻击是 Web 应用主要威胁的行业观察一致\cite{owasp2021top10}；右图显示，风险分
+不低于 7.0 的高危及以上威胁共 9 项，占比 75\%，表明本系统面对的威胁整体处于
+高风险水平，防护设计须以此为基准。
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[b]{0.47\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=6.2cm, height=5.0cm,
+  axis lines=left,
+  xbar,
+  xlabel={威胁数量（项）},
+  symbolic y coords={权限提升,抵赖,拒绝服务,假冒,信息泄露,篡改},
+  ytick=data,
+  xmin=0, xmax=4.8,
+  nodes near coords,
+  nodes near coords style={font=\scriptsize, color=aegisgray},
+  bar width=8pt,
+  ymajorgrids=false,
+  xmajorgrids=true,
+  axis line style={rulegray!85}
+]
+\addplot[fill=aegisblue!62, draw=aegisblue!85] coordinates {
+  (1,权限提升) (1,抵赖) (1,拒绝服务) (2,假冒) (3,信息泄露) (4,篡改)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{按 STRIDE 类型分布}
+\label{fig:threat-type}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.47\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=6.2cm, height=5.0cm,
+  axis lines=left,
+  ybar,
+  xlabel={DREAD 风险分区间},
+  ylabel={威胁数量（项）},
+  symbolic x coords={{[5,6)},{[6,7)},{[7,8)},{[8,9)},{[9,10]}},
+  xtick=data,
+  xticklabel style={font=\scriptsize},
+  ymin=0, ymax=5.6,
+  nodes near coords,
+  nodes near coords style={font=\scriptsize, color=aegisgray},
+  bar width=13pt,
+  ymajorgrids=true,
+  axis line style={rulegray!85}
+]
+\addplot[fill=aegisamber!55, draw=aegisamber!85] coordinates {
+  ({[5,6)},1) ({[6,7)},1) ({[7,8)},3) ({[8,9)},5) ({[9,10]},2)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{按 DREAD 风险分分布}
+\label{fig:threat-score}
+\end{subfigure}
+\caption{威胁分布特征分析}
+\label{fig:threat-dist}
+\end{figure}
+
+\subsection{安全需求矩阵}
+
+将上述威胁分析结果映射为具体的安全属性需求，得到 \cref{tab:security-matrix}。
+该矩阵建立了“安全属性—威胁编号—实现机制”的三元对应关系，为后续设计提供了
+可追溯的依据。
+
+\begin{table}[htbp]
+\centering
+\caption{安全需求矩阵}
+\label{tab:security-matrix}
+\small
+\begin{tabular}{@{}l l p{6.4cm}@{}}
+\toprule
+\textbf{安全属性} & \textbf{对应威胁} & \textbf{实现机制} \\
+\midrule
+机密性     & T-05, T-08, T-10 & 凭据加盐哈希存储；日志敏感字段脱敏；
+                                出站地址白名单 \\
+完整性     & T-01, T-02, T-07, T-11 & 结构指纹比对；语义净化；
+                                参数化查询与参数数组化调用 \\
+可用性     & T-06 & 双重速率限制；检测异常降级放行 \\
+可认证性   & T-03 & 签名算法白名单；令牌短时效与唯一标识 \\
+可授权性   & T-04 & 资源属主校验；基于角色的访问控制 \\
+可审计性   & T-09 & 全链路追踪标识；结构化事件记录 \\
+不可否认性 & T-09 & 哈希链式审计日志与完整性校验接口 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{可行性分析}
+
+\paragraph{技术可行性。}
+本文方法的三项关键技术均有成熟基础：SQL 的语法分析属编译原理的经典问题
+\cite{aho2006compilers}，递归下降法实现直观且便于施加容错策略；Java 平台的
+字节码注入有 Byte Buddy 等成熟工具支撑\cite{bytebuddy2024}；语法树差分虽有
+树编辑距离等复杂算法\cite{zhang1989simple,bille2005survey}，但本文所需的
+“定位新增与缺失结构”可由多重集差分以线性复杂度完成。
+
+\paragraph{进度可行性。}
+课程设计周期为两周。本文将风险最高的字节码注入验证前置到第三日完成，
+并预设了“退化为数据访问层显式埋点”的备选方案，以控制技术不确定性对进度的影响。
+
+\paragraph{法律合规性。}
+本课题涉及漏洞构造与攻击测试，须严格遵守法律边界。所有测试均在本地隔离环境中
+针对自建靶场执行，不涉及任何第三方系统；靶场中的漏洞代码集中隔离并显式标注，
+不随生产构建发布；反序列化类测试采用无害化载荷。相关实践符合
+《中华人民共和国网络安全法》《数据安全法》以及国家标准 GB/T 20984
+关于风险评估活动的规范要求\cite{gbt20984}。

@@ -1,0 +1,340 @@
+% ============================================================
+%  AEGIS 综合设计报告 · 样式预置
+%
+%  设计取向：参照 IEEE Transactions / ACM TOPS 等期刊的排版惯例，
+%  强调版面克制、图表自明、术语统一。
+% ============================================================
+
+% ---------- 页面与版心 ----------
+\usepackage[a4paper,top=2.6cm,bottom=2.4cm,left=2.7cm,right=2.7cm,
+            headheight=14pt,footskip=1.1cm]{geometry}
+
+% ---------- 字体 ----------
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+% 正文西文使用 Times 系列，与中文宋体的字重相称
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\setmonofont{Consolas}[Scale=0.92]
+% Times New Roman 不含 OMS 编码的数学符号字形（如 \vert 的可变尺寸形式），
+% 显式将该符号族指向 Computer Modern，消除字体替换警告
+\DeclareFontFamily{OMS}{TimesNewRoman(0)}{\skewchar\font=48}
+\DeclareFontShape{OMS}{TimesNewRoman(0)}{m}{n}{<->ssub*cmsy/m/n}{}
+\DeclareFontShape{OMS}{TimesNewRoman(0)}{b}{n}{<->ssub*cmsy/b/n}{}
+
+% 中文字体：正文宋体、标题黑体、强调楷体
+% 黑体本身即为粗笔画字体，无独立粗体字重，故显式指定 BoldFont 为自身，
+% 避免 LaTeX 因找不到粗体变体而发出字体替换警告
+\setCJKmainfont{SimSun}[BoldFont=SimHei, ItalicFont=KaiTi]
+\setCJKsansfont{SimHei}[BoldFont=SimHei, ItalicFont=SimHei]
+\setCJKmonofont{FangSong}[BoldFont=FangSong, ItalicFont=FangSong]
+
+% ---------- 中文引号 ----------
+% 正文中的引号统一使用全角弯引号字符（U+201C / U+201D），
+% 由 CJK 字体渲染，以保证中文语境下的标点形态正确。
+% 提供语义化命令以便统一调整。
+\newcommand{\zh}[1]{“#1”}
+
+% ---------- 颜色系统 ----------
+\usepackage{xcolor}
+\definecolor{aegisblue}{HTML}{1D4ED8}
+\definecolor{aegisind}{HTML}{4F46E5}
+\definecolor{aegisteal}{HTML}{0F766E}
+\definecolor{aegisred}{HTML}{BE123C}
+\definecolor{aegisamber}{HTML}{B45309}
+\definecolor{aegisgray}{HTML}{475569}
+\definecolor{rulegray}{HTML}{94A3B8}
+\definecolor{panelbg}{HTML}{F8FAFC}
+\definecolor{codebg}{HTML}{FAFBFD}
+\definecolor{codekw}{HTML}{1D4ED8}
+\definecolor{codestr}{HTML}{047857}
+\definecolor{codecmt}{HTML}{64748B}
+
+% ---------- 图表 ----------
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{threeparttable}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{rotating}
+
+% 浮动体放置参数：放宽页面容纳浮动体的比例上限，
+% 减少表格与图形被推迟到后续页面而在原处留下大片空白的情况
+\renewcommand{\topfraction}{0.88}
+\renewcommand{\bottomfraction}{0.72}
+\renewcommand{\textfraction}{0.10}
+\renewcommand{\floatpagefraction}{0.78}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+% 浮动体与正文的间距
+\setlength{\textfloatsep}{14pt plus 3pt minus 3pt}
+\setlength{\intextsep}{12pt plus 3pt minus 3pt}
+\setlength{\floatsep}{12pt plus 3pt minus 3pt}
+
+% 表格行距略微放宽，提升可读性
+\renewcommand{\arraystretch}{1.28}
+\setlength{\tabcolsep}{6pt}
+
+% 题注：小五号、加粗标签、居中
+\captionsetup{
+  font={small},
+  labelfont={bf,color=aegisgray},
+  labelsep=quad,
+  skip=6pt,
+  justification=centering
+}
+\captionsetup[table]{position=top,skip=5pt}
+\captionsetup[figure]{position=bottom,skip=7pt}
+\captionsetup[sub]{font={footnotesize},labelfont={bf}}
+
+\renewcommand{\thetable}{\thesection--\arabic{table}}
+\renewcommand{\thefigure}{\thesection--\arabic{figure}}
+% 图表编号按章重新计数。ctexart 的 section 是顶层章节单位，
+% 但 LaTeX 默认不会在 section 处重置 table/figure 计数器，
+% 需显式声明依赖关系，否则编号会跨章连续累加（如出现"表 6--17"）
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+\counterwithin{equation}{section}
+
+% ---------- TikZ / PGFPlots ----------
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{
+  arrows.meta, positioning, calc, fit, backgrounds, shapes.geometric,
+  shapes.misc, shapes.symbols, decorations.pathreplacing,
+  decorations.pathmorphing, patterns, matrix, chains, shadows.blur, trees
+}
+\usepgfplotslibrary{groupplots, fillbetween, statistics}
+% 甘特图里程碑等符号
+\usepackage{pifont}
+
+% 统一的绘图基调：细网格、无外框、克制的配色
+\pgfplotsset{
+  every axis/.append style={
+    line width=0.55pt,
+    tick style={line width=0.5pt, color=rulegray},
+    label style={font=\small},
+    tick label style={font=\footnotesize},
+    title style={font=\small\bfseries},
+    legend style={
+      font=\footnotesize,
+      draw=rulegray!60,
+      line width=0.4pt,
+      fill=white,
+      fill opacity=0.92,
+      text opacity=1,
+      rounded corners=1.5pt
+    },
+    grid style={rulegray!30, line width=0.35pt, dashed},
+    axis line style={rulegray!85}
+  },
+  % 期刊图常用：仅保留左侧与底部坐标轴
+  scientific/.style={
+    axis lines=left,
+    ymajorgrids=true,
+    enlarge x limits=0.06,
+    enlarge y limits={upper, value=0.12}
+  }
+}
+
+% TikZ 通用节点样式
+\tikzset{
+  >=Latex,
+  block/.style={
+    draw=aegisblue!70, fill=aegisblue!6, line width=0.6pt,
+    rounded corners=2.2pt, align=center, font=\small,
+    inner sep=5pt, minimum height=8mm
+  },
+  blockalt/.style={
+    draw=aegisteal!70, fill=aegisteal!6, line width=0.6pt,
+    rounded corners=2.2pt, align=center, font=\small,
+    inner sep=5pt, minimum height=8mm
+  },
+  blockred/.style={
+    draw=aegisred!75, fill=aegisred!7, line width=0.7pt,
+    rounded corners=2.2pt, align=center, font=\small,
+    inner sep=5pt, minimum height=8mm
+  },
+  astnode/.style={
+    draw=aegisblue!65, fill=aegisblue!8, line width=0.55pt,
+    rounded corners=2pt, align=center, font=\scriptsize,
+    inner sep=3pt, minimum width=13mm, minimum height=5.4mm
+  },
+  astinj/.style={
+    draw=aegisred!80, fill=aegisred!10, line width=0.85pt,
+    rounded corners=2pt, align=center, font=\scriptsize\bfseries,
+    inner sep=3pt, minimum width=13mm, minimum height=5.4mm
+  },
+  lbl/.style={font=\scriptsize, color=aegisgray},
+  flow/.style={->, line width=0.6pt, color=aegisgray!85},
+  flowred/.style={->, line width=0.9pt, color=aegisred!85}
+}
+
+% ---------- 代码环境 ----------
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{codekw}\bfseries,
+  stringstyle=\color{codestr},
+  commentstyle=\color{codecmt}\itshape,
+  numberstyle=\ttfamily\tiny\color{rulegray},
+  numbers=left,
+  numbersep=7pt,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{rulegray!45},
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  tabsize=2,
+  xleftmargin=14pt,
+  xrightmargin=2pt,
+  aboveskip=8pt,
+  belowskip=6pt,
+  captionpos=b,
+  escapeinside={(*@}{@*)}
+}
+
+\lstdefinestyle{javastyle}{language=Java}
+\lstdefinestyle{sqlstyle}{
+  language=SQL,
+  morekeywords={UNION,SLEEP,BENCHMARK,LOAD_FILE,EXTRACTVALUE,CAST,VARCHAR},
+  emph={SLEEP,BENCHMARK,LOAD_FILE,EXTRACTVALUE,UNION},
+  emphstyle=\color{aegisred}\bfseries
+}
+
+% 代码清单题注汉化并按章编号。
+% lstlisting 计数器由 listings 宏包在文档开始时创建，
+% 故延迟至 \AtBeginDocument 阶段配置
+\renewcommand{\lstlistingname}{代码}
+\renewcommand{\lstlistlistingname}{代码目录}
+\AtBeginDocument{%
+  \counterwithin{lstlisting}{section}%
+  \renewcommand{\thelstlisting}{\thesection--\arabic{lstlisting}}%
+}
+
+% ---------- 算法 ----------
+\usepackage[ruled,linesnumbered,algosection]{algorithm2e}
+\SetAlCapFnt{\small\bfseries\color{aegisgray}}
+\SetAlCapNameFnt{\small}
+\SetAlgoCaptionSeparator{\quad}
+\SetKwInOut{Input}{输入}
+\SetKwInOut{Output}{输出}
+\SetKwFor{For}{for}{do}{end}
+\SetKwFor{While}{while}{do}{end}
+\SetKwIF{If}{ElseIf}{Else}{if}{then}{else if}{else}{end}
+\SetKwRepeat{Repeat}{repeat}{until}
+
+% ---------- 定理环境 ----------
+\theoremstyle{definition}
+\newtheorem{definition}{定义}[section]
+\newtheorem{property}{性质}[section]
+\theoremstyle{plain}
+\newtheorem{proposition}{命题}[section]
+\newtheorem{theorem}{定理}[section]
+\theoremstyle{remark}
+\newtheorem{remark}{注}[section]
+
+% ---------- 版式细节 ----------
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{footmisc}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+\setlist{itemsep=1pt, parsep=1pt, topsep=3pt, leftmargin=*}
+
+% 章节标题：黑体、适度留白
+\ctexset{
+  section={
+    format={\Large\sffamily\bfseries},
+    beforeskip={16pt plus 2pt minus 2pt},
+    afterskip={10pt plus 1pt}
+  },
+  subsection={
+    format={\large\sffamily\bfseries},
+    beforeskip={12pt plus 2pt minus 1pt},
+    afterskip={7pt plus 1pt}
+  },
+  subsubsection={
+    format={\normalsize\sffamily\bfseries},
+    beforeskip={10pt plus 1pt},
+    afterskip={5pt}
+  }
+}
+
+% 页眉页脚
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{rulegray!70}\leaders\hrule height \headrulewidth\hfill}}
+\fancyhead[L]{\footnotesize\color{aegisgray}\sffamily AEGIS：基于抽象语法树结构指纹的 Web 攻击语义检测}
+\fancyhead[R]{\footnotesize\color{aegisgray}\thepage}
+
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \renewcommand{\headrulewidth}{0pt}
+  \fancyfoot[C]{\footnotesize\color{aegisgray}\thepage}
+}
+
+% 要点提示框
+\newtcolorbox{keybox}[1][]{
+  enhanced, breakable,
+  colback=panelbg, colframe=aegisblue!55,
+  boxrule=0.5pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+  arc=2pt,
+  borderline west={2.2pt}{0pt}{aegisblue},
+  fontupper=\small,
+  #1
+}
+
+\newtcolorbox{warnbox}[1][]{
+  enhanced, breakable,
+  colback=aegisred!3, colframe=aegisred!45,
+  boxrule=0.5pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+  arc=2pt,
+  borderline west={2.2pt}{0pt}{aegisred},
+  fontupper=\small,
+  #1
+}
+
+% ---------- 超链接（置于最后加载）----------
+\usepackage[
+  colorlinks=true,
+  linkcolor=aegisblue,
+  citecolor=aegisteal,
+  urlcolor=aegisind,
+  bookmarksnumbered=true,
+  pdfstartview=FitH
+]{hyperref}
+\usepackage{cleveref}
+\crefname{figure}{图}{图}
+\crefname{table}{表}{表}
+\crefname{section}{第}{第}
+\crefname{equation}{式}{式}
+\crefname{algorithm}{算法}{算法}
+\crefname{definition}{定义}{定义}
+\crefname{property}{性质}{性质}
+
+% ---------- 常用宏 ----------
+\newcommand{\aegis}{\textsc{Aegis}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\term}[1]{\textbf{#1}}
+% 数学记号
+\newcommand{\fp}{\ensuremath{\mathcal{F}}}          % 指纹函数
+\newcommand{\Norm}{\ensuremath{\mathcal{N}}}        % 归一化算子
+\newcommand{\Ser}{\ensuremath{\mathcal{S}}}         % 序列化算子
+\newcommand{\Tree}{\ensuremath{\mathcal{T}}}        % 语法树
+\newcommand{\Sig}{\ensuremath{\Sigma}}              % 签名多重集
+\newcommand{\jac}{\ensuremath{J}}                   % Jaccard 相似度
