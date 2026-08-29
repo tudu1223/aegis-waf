@@ -22,3 +22,6 @@ Thumbs.db
 *.tmp
 cp.txt
 dbg/
+
+# 临时运行标记
+.runstamp
