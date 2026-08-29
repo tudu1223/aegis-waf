@@ -1,0 +1,435 @@
+@use './tokens' as *;
+
+// ============================================================
+// 全局基础样式
+// ============================================================
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: $font-sans;
+  font-size: $fs-body;
+  line-height: 1.6;
+  color: $text-primary;
+  background: $bg-canvas;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+// 页面画布：柔和的渐变 + 极淡的网格，营造精密感而不喧宾夺主
+.app-canvas {
+  position: relative;
+  min-height: 100%;
+  background: $grad-canvas;
+
+  // 精密网格：仅在顶部区域可见，向下渐隐
+  &::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgba(59, 130, 246, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59, 130, 246, 0.035) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 20%, transparent 70%);
+  }
+
+  // 顶部光晕：引导视线，避免大面积平铺的单调
+  &::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(ellipse 70% 40% at 50% -5%,
+                rgba(99, 102, 241, 0.07) 0%, transparent 65%);
+  }
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: $fw-semibold;
+  color: $text-primary;
+  letter-spacing: -0.015em;
+}
+
+p { margin: 0; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+
+a {
+  color: $primary-600;
+  text-decoration: none;
+  transition: color $dur-fast $ease-out;
+  &:hover { color: $primary-700; }
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+code, pre, .mono {
+  font-family: $font-mono;
+}
+
+// ---------- 滚动条：默认样式会破坏精致感 ----------
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: $border-strong;
+  border-radius: $r-full;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background $dur-fast;
+  &:hover {
+    background: #94A3B8;
+    background-clip: content-box;
+  }
+}
+
+// ---------- 焦点环：可访问性 + 专业度 ----------
+:focus-visible {
+  outline: 2px solid $primary-400;
+  outline-offset: 2px;
+  border-radius: $r-xs;
+}
+
+// ============================================================
+// 通用组件样式
+// ============================================================
+
+// ---------- 卡片面板 ----------
+.panel {
+  position: relative;
+  background: $grad-surface;
+  border: 1px solid $border-subtle;
+  border-radius: $r-lg;
+  box-shadow: $shadow-sm;
+  transition: box-shadow $dur-normal $ease-out,
+              transform $dur-normal $ease-out,
+              border-color $dur-normal $ease-out;
+
+  &.is-interactive:hover {
+    box-shadow: $shadow-md;
+    transform: translateY(-2px);
+    border-color: $border-default;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $sp-3;
+    padding: $sp-4 $sp-5;
+    border-bottom: 1px solid $border-subtle;
+  }
+
+  &__title-group {
+    display: flex;
+    align-items: center;
+    gap: $sp-3;
+    min-width: 0;
+  }
+
+  // 标题左侧的主色标识条
+  &__accent {
+    width: 3px;
+    height: 18px;
+    border-radius: $r-full;
+    background: $grad-primary;
+    flex-shrink: 0;
+  }
+
+  &__title {
+    font-size: $fs-h3;
+    font-weight: $fw-semibold;
+    color: $text-primary;
+    white-space: nowrap;
+  }
+
+  // 英文副标题：双语标题是专业系统观感的重要来源
+  &__subtitle {
+    font-size: $fs-micro;
+    font-weight: $fw-medium;
+    color: $text-tertiary;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  &__body {
+    padding: $sp-5;
+  }
+
+  &__body--flush {
+    padding: 0;
+  }
+}
+
+// ---------- 徽标 ----------
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: $sp-1;
+  padding: 2px $sp-2;
+  font-size: $fs-micro;
+  font-weight: $fw-semibold;
+  border-radius: $r-full;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  line-height: 1.6;
+
+  &--critical { color: $critical; background: $critical-bg; border-color: $critical-border; }
+  &--high     { color: $high;     background: $high-bg;     border-color: $high-border; }
+  &--medium   { color: $medium;   background: $medium-bg;   border-color: $medium-border; }
+  &--low      { color: $low;      background: $low-bg;      border-color: $low-border; }
+  &--safe     { color: $safe;     background: $safe-bg;     border-color: $safe-border; }
+  &--info     { color: $info;     background: $info-bg;     border-color: $info-border; }
+  &--neutral  { color: $text-secondary; background: $bg-subtle; border-color: $border-default; }
+}
+
+// ---------- 按钮 ----------
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $sp-2;
+  padding: $sp-2 $sp-4;
+  font-size: $fs-small;
+  font-weight: $fw-medium;
+  border-radius: $r-sm;
+  border: 1px solid transparent;
+  transition: all $dur-fast $ease-out;
+  white-space: nowrap;
+
+  // 按下时的物理反馈
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    background: $grad-primary;
+    color: $text-inverse;
+    box-shadow: $shadow-xs;
+    &:hover:not(:disabled) { box-shadow: $shadow-primary; }
+  }
+
+  &--secondary {
+    background: $bg-surface;
+    color: $text-secondary;
+    border-color: $border-default;
+    &:hover:not(:disabled) {
+      background: $bg-hover;
+      border-color: $border-strong;
+      color: $text-primary;
+    }
+  }
+
+  &--ghost {
+    background: transparent;
+    color: $text-secondary;
+    &:hover:not(:disabled) { background: $bg-hover; color: $text-primary; }
+  }
+
+  &--danger {
+    background: $grad-critical;
+    color: $text-inverse;
+    &:hover:not(:disabled) { box-shadow: $shadow-critical; }
+  }
+
+  &--sm { padding: $sp-1 $sp-3; font-size: $fs-micro; }
+}
+
+// ---------- 分段控制器（防护模式切换）----------
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  background: $bg-subtle;
+  border: 1px solid $border-subtle;
+  border-radius: $r-md;
+  gap: 2px;
+
+  &__item {
+    position: relative;
+    padding: $sp-1 $sp-4;
+    font-size: $fs-small;
+    font-weight: $fw-medium;
+    color: $text-secondary;
+    border-radius: $r-sm;
+    transition: all $dur-fast $ease-out;
+
+    &:hover:not(.is-active) { color: $text-primary; }
+
+    &.is-active {
+      background: $bg-surface;
+      color: $primary-600;
+      box-shadow: $shadow-xs;
+      font-weight: $fw-semibold;
+    }
+
+    &.is-active.is-off      { color: $text-secondary; }
+    &.is-active.is-monitor  { color: $medium; }
+    &.is-active.is-block    { color: $safe; }
+  }
+}
+
+// ---------- 状态点 ----------
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: $r-full;
+  flex-shrink: 0;
+  position: relative;
+
+  &--live {
+    background: $safe;
+    // 唯一保留的常驻动效：系统心跳指示
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: $r-full;
+      background: $safe;
+      opacity: 0.3;
+      animation: pulse-ring 2s $ease-in-out infinite;
+    }
+  }
+
+  &--warn     { background: $medium; }
+  &--critical { background: $critical; }
+  &--idle     { background: $text-tertiary; }
+}
+
+@keyframes pulse-ring {
+  0%, 100% { transform: scale(1);   opacity: 0.3; }
+  50%      { transform: scale(1.5); opacity: 0; }
+}
+
+// ---------- 空状态 ----------
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $sp-12 $sp-6;
+  text-align: center;
+  color: $text-tertiary;
+
+  &__icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: $sp-4;
+    border-radius: $r-lg;
+    background: $bg-subtle;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    opacity: 0.7;
+  }
+
+  &__title {
+    font-size: $fs-body;
+    font-weight: $fw-medium;
+    color: $text-secondary;
+    margin-bottom: $sp-1;
+  }
+
+  &__desc {
+    font-size: $fs-small;
+    color: $text-tertiary;
+    max-width: 320px;
+  }
+}
+
+// ---------- 骨架屏（优于 loading 转圈）----------
+.skeleton {
+  background: linear-gradient(90deg,
+              $bg-subtle 25%, $bg-muted 37%, $bg-subtle 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: $r-sm;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+// ---------- 数据表格 ----------
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: $fs-small;
+
+  thead th {
+    padding: $sp-3 $sp-4;
+    text-align: left;
+    font-size: $fs-micro;
+    font-weight: $fw-semibold;
+    color: $text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: $bg-subtle;
+    border-bottom: 1px solid $border-subtle;
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid $border-subtle;
+    transition: background $dur-instant;
+    &:hover { background: $bg-hover; }
+    &:last-child { border-bottom: none; }
+  }
+
+  tbody td {
+    padding: $sp-3 $sp-4;
+    color: $text-secondary;
+    vertical-align: middle;
+  }
+}
+
+// ---------- 页面进入过渡 ----------
+.page-enter-active { transition: all $dur-normal $ease-out; }
+.page-leave-active { transition: all $dur-fast $ease-in-out; }
+.page-enter-from   { opacity: 0; transform: translateY(10px); }
+.page-leave-to     { opacity: 0; }
+
+// ---------- 通用工具类 ----------
+.mono-num { @include numeric; }
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flex-center { display: flex; align-items: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }

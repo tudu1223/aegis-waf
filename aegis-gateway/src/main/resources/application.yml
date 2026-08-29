@@ -1,0 +1,26 @@
+server:
+  port: 8000
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: aegis-gateway
+  main:
+    # 网关以 Servlet 方式接管根路径，无需 Spring MVC 的默认静态资源处理
+    banner-mode: console
+
+aegis:
+  gateway:
+    # 后端业务系统地址（靶场）
+    upstream: http://localhost:8090
+    # 控制台地址，用于策略同步与事件上报
+    console: http://localhost:8080
+
+logging:
+  level:
+    root: INFO
+    com.aegis.gateway: INFO

@@ -1,0 +1,37 @@
+server:
+  port: 8090
+  # 统一使用 UTF-8，避免中文内容在响应中出现乱码
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: vuln-target
+  datasource:
+    url: jdbc:h2:mem:targetdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  sql:
+    init:
+      # 关闭自动初始化，改由 DatabaseInitConfig 显式以 UTF-8 执行脚本，
+      # 避免 Spring Boot 默认实现使用平台字符集导致中文数据乱码
+      mode: never
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+target:
+  # 文件下载功能的根目录，路径穿越测试的边界
+  file-root: ./target-files
+
+logging:
+  level:
+    root: INFO
+    com.target: DEBUG
+    # 打印实际执行的 SQL，便于对照 RASP 探针捕获的语句
+    org.springframework.jdbc.core.JdbcTemplate: DEBUG

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.aegis</groupId>
+    <artifactId>aegis-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
+
+  <artifactId>aegis-agent</artifactId>
+  <name>AEGIS RASP Agent</name>
+  <description>RASP 探针：字节码注入钩取 JDBC 与命令执行</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aegis</groupId>
+      <artifactId>aegis-core</artifactId>
+      <exclusions>
+        <!-- 探针会被注入到宿主应用的 JVM 中，其携带的任何日志实现
+             都可能与宿主应用的日志框架冲突（如 Logback 检测到
+             竞争的 LoggerFactory 会直接拒绝启动）。
+             探针必须保持极简，仅携带检测所必需的依赖。 -->
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>net.bytebuddy</groupId>
+      <artifactId>byte-buddy</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>net.bytebuddy</groupId>
+      <artifactId>byte-buddy-agent</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.5.2</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <finalName>aegis-agent</finalName>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Premain-Class>com.aegis.agent.AegisAgent</Premain-Class>
+                    <Agent-Class>com.aegis.agent.AegisAgent</Agent-Class>
+                    <Can-Redefine-Classes>true</Can-Redefine-Classes>
+                    <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/services/org.slf4j.**</exclude>
+                    <exclude>module-info.class</exclude>
+                    <!-- 排除全部日志门面与实现，避免与宿主应用的
+                         日志框架产生 LoggerFactory 竞争导致启动失败 -->
+                    <exclude>org/slf4j/**</exclude>
+                    <exclude>ch/qos/logback/**</exclude>
+                    <exclude>org/apache/commons/logging/**</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

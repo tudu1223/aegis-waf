@@ -1,0 +1,25 @@
+{
+  "name": "aegis-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AEGIS 语义化 Web 攻击检测平台 - 指挥中心前端",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 5173"
+  },
+  "dependencies": {
+    "vue": "^3.4.27",
+    "vue-router": "^4.3.2",
+    "pinia": "^2.1.7",
+    "echarts": "^5.5.0",
+    "@antv/g6": "^4.8.24",
+    "axios": "^1.7.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.5",
+    "vite": "^5.2.11",
+    "sass": "^1.77.2"
+  }
+}
