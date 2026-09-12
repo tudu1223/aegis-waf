@@ -50,6 +50,14 @@ public class ReverseProxyServlet extends HttpServlet {
     protected void service(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
+        // 跨源预检：演示页（8090）以网关通道发起请求前，浏览器会先发
+        // OPTIONS 探路。直接应答，不转发后端，也不计入检测统计。
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            applyCorsHeaders(request, response);
+            response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+            return;
+        }
+
         String targetUrl = buildTargetUrl(request);
         HttpURLConnection conn = null;
         try {
@@ -68,6 +76,7 @@ public class ReverseProxyServlet extends HttpServlet {
             int status = conn.getResponseCode();
             response.setStatus(status);
             copyResponseHeaders(conn, response);
+            applyCorsHeaders(request, response);
             copyResponseBody(conn, response, status);
 
         } catch (IOException e) {
@@ -159,6 +168,20 @@ public class ReverseProxyServlet extends HttpServlet {
             in.transferTo(response.getOutputStream());
             response.getOutputStream().flush();
         }
+    }
+
+    /**
+     * 为跨源演示页放行 CORS。
+     *
+     * <p>靶场演示页（http://localhost:8090）以网关通道发起请求时
+     * 属跨源访问。生产 WAF 不会这样做，此处为本地教学演示便利。
+     * 仅放行 GET/POST/PUT/DELETE，不附带凭据。
+     */
+    private void applyCorsHeaders(HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Aegis-Trace");
+        response.setHeader("Access-Control-Expose-Headers", "X-Aegis-Blocked, X-Aegis-Trace, X-Aegis-Gateway");
     }
 
     /** 提取客户端真实 IP，优先使用代理链首个地址。 */

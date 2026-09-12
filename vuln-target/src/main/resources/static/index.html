@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS 靶场 · 注入演示台</title>
+<style>
+  :root {
+    --bg: #0b0f17;
+    --panel: #111827;
+    --panel-2: #0d1420;
+    --border: #1f2a3d;
+    --text: #e5edf7;
+    --muted: #7d8ea8;
+    --accent: #22d3ee;
+    --accent-2: #0ea5e9;
+    --danger: #ef4444;
+    --danger-bg: rgba(239, 68, 68, .12);
+    --ok: #22c55e;
+    --ok-bg: rgba(34, 197, 94, .12);
+    --warn: #f59e0b;
+    --warn-bg: rgba(245, 158, 11, .12);
+    --mono: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #0d1526 0%, #101b30 100%);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+    flex-wrap: wrap;
+  }
+  .logo {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px; color: #06121f;
+    letter-spacing: -1px;
+  }
+  header h1 { font-size: 17px; font-weight: 700; }
+  header .sub { font-size: 12px; color: var(--muted); }
+  .spacer { flex: 1; }
+
+  /* ── 顶部控制条 ─────────────────────────── */
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .switch-group {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 10px;
+    font-size: 12.5px;
+  }
+  .switch-group .lbl { color: var(--muted); }
+  .toggle {
+    display: inline-flex; border-radius: 6px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .toggle button {
+    background: transparent; color: var(--muted); border: none;
+    padding: 4px 12px; font-size: 12.5px; cursor: pointer;
+    font-family: inherit; transition: all .15s;
+  }
+  .toggle button.on { background: var(--accent); color: #06121f; font-weight: 700; }
+  .toggle button.on.red { background: var(--danger); color: #fff; }
+  .toggle button.on.green { background: var(--ok); color: #06121f; }
+
+  main {
+    max-width: 1280px; margin: 0 auto; padding: 20px 24px 60px;
+    display: grid; grid-template-columns: 380px 1fr; gap: 20px;
+  }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+  }
+  .panel-title {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    font-weight: 700; font-size: 13.5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .panel-body { padding: 14px 16px; }
+
+  /* ── 场景卡片 ─────────────────────────── */
+  .scene {
+    border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 12px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+    background: var(--panel-2);
+  }
+  .scene:hover { border-color: var(--accent); }
+  .scene.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .scene-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+  }
+  .scene-id {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    background: rgba(34, 211, 238, .1); padding: 2px 8px; border-radius: 5px;
+    font-weight: 700;
+  }
+  .scene-name { font-weight: 600; font-size: 13.5px; flex: 1; }
+  .scene-cvss {
+    font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 5px;
+    font-weight: 700;
+  }
+  .cvss-CRITICAL { color: #f87171; background: var(--danger-bg); }
+  .cvss-HIGH { color: #fb923c; background: var(--warn-bg); }
+  .cvss-MEDIUM { color: #facc15; background: var(--warn-bg); }
+  .cvss-LOW { color: #a3e635; background: var(--ok-bg); }
+  .scene-body {
+    padding: 0 14px 10px; color: var(--muted); font-size: 12px;
+    display: none;
+  }
+  .scene.active .scene-body { display: block; }
+  .scene-body .api { font-family: var(--mono); color: var(--accent); margin-top: 3px; font-size: 11.5px; }
+
+  /* ── 表单 ─────────────────────────── */
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .field textarea, .field input {
+    width: 100%; background: #0a0f1a; color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 12px; font-family: var(--mono); font-size: 13px;
+    outline: none; transition: border-color .15s;
+    resize: vertical;
+  }
+  .field textarea:focus, .field input:focus { border-color: var(--accent); }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .preset {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    background: rgba(34, 211, 238, .08); border: 1px solid rgba(34, 211, 238, .25);
+    padding: 3px 9px; border-radius: 5px; cursor: pointer; transition: all .15s;
+  }
+  .preset:hover { background: rgba(34, 211, 238, .2); }
+
+  .btn {
+    width: 100%; padding: 11px; border: none; border-radius: 8px;
+    font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+    transition: all .15s;
+  }
+  .btn-attack {
+    background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff;
+  }
+  .btn-attack:hover { filter: brightness(1.15); }
+  .btn-attack:disabled { filter: grayscale(.6); cursor: wait; }
+
+  /* ── 结果区 ─────────────────────────── */
+  .result-empty {
+    padding: 40px 20px; text-align: center; color: var(--muted); font-size: 13px;
+  }
+  .verdict {
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+    border: 1px solid; animation: slideIn .25s ease;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; } }
+  .verdict h3 { font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .verdict .meta { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .verdict.hit { background: var(--danger-bg); border-color: rgba(239,68,68,.45); }
+  .verdict.hit h3 { color: #f87171; }
+  .verdict.blocked { background: var(--ok-bg); border-color: rgba(34,197,94,.45); }
+  .verdict.blocked h3 { color: #4ade80; }
+  .verdict.safe { background: var(--ok-bg); border-color: rgba(34,197,94,.45); }
+  .verdict.safe h3 { color: #4ade80; }
+  .verdict.normal { background: rgba(34,211,238,.08); border-color: rgba(34,211,238,.35); }
+  .verdict.normal h3 { color: var(--accent); }
+
+  .sql-box {
+    background: #070b13; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; margin-bottom: 12px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .sql-box .cap { color: var(--muted); font-size: 11px; margin-bottom: 6px; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+  .kw { color: #c084fc; font-weight: 700; }
+  .str { color: #fbbf24; }
+  .inj { color: #ef4444; font-weight: 700; background: rgba(239,68,68,.15); border-radius: 3px; padding: 0 2px; }
+
+  pre.json {
+    background: #070b13; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; font-family: var(--mono); font-size: 12px;
+    overflow: auto; max-height: 320px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-all;
+  }
+
+  /* ── 数据表 ─────────────────────────── */
+  table.data {
+    width: 100%; border-collapse: collapse; font-size: 12.5px;
+    margin-bottom: 12px;
+  }
+  table.data th {
+    text-align: left; padding: 7px 10px; color: var(--muted);
+    border-bottom: 1px solid var(--border); font-weight: 600; font-size: 11.5px;
+  }
+  table.data td {
+    padding: 7px 10px; border-bottom: 1px solid rgba(31,42,61,.6);
+    font-family: var(--mono); font-size: 12px; max-width: 340px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .leak { color: #f87171; font-weight: 700; }
+
+  /* ── 漏洞状态列表 ─────────────────────────── */
+  .vuln-list { max-height: 260px; overflow: auto; }
+  .vuln-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; font-size: 12.5px; border-bottom: 1px solid rgba(31,42,61,.4);
+  }
+  .vuln-item .vid { font-family: var(--mono); color: var(--muted); font-size: 11px; width: 62px; flex-shrink: 0; }
+  .vuln-item .vname { flex: 1; color: var(--text); }
+  .status-pill {
+    font-size: 10.5px; padding: 2px 8px; border-radius: 99px; font-weight: 700; flex-shrink: 0;
+  }
+  .status-pill.vuln { color: #f87171; background: var(--danger-bg); }
+  .status-pill.fixed { color: #4ade80; background: var(--ok-bg); }
+
+  footer {
+    text-align: center; color: var(--muted); font-size: 11.5px;
+    padding: 18px; border-top: 1px solid var(--border);
+  }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
+  .hint b { color: var(--text); }
+  .tag-gw { color: var(--accent); }
+  .tag-rasp { color: #c084fc; }
+
+  /* XSS 演示区 */
+  .xss-wall {
+    border: 1px dashed var(--border); border-radius: 8px;
+    padding: 14px; margin-bottom: 12px; background: #0a101c;
+  }
+  .xss-wall .cap { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .xss-wall .note-view { padding: 10px; background: #070b13; border-radius: 6px; }
+  .flash { animation: flash .6s ease 2; }
+  @keyframes flash { 0%,100% { background: #070b13; } 50% { background: rgba(239,68,68,.25); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🛡</div>
+  <div>
+    <h1>AEGIS 靶场 · 注入演示台</h1>
+    <div class="sub">vuln-target 8090 · 每一次攻击都会在这里留下证据</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <div class="switch-group">
+      <span class="lbl">请求通道</span>
+      <div class="toggle" id="channelToggle">
+        <button data-v="direct">直连靶场 :8090</button>
+        <button data-v="gateway" class="on red">经网关 :8000</button>
+      </div>
+    </div>
+    <div class="switch-group">
+      <span class="lbl">靶场代码</span>
+      <div class="toggle" id="patchToggle">
+        <button data-v="vuln" class="on red">含漏洞</button>
+        <button data-v="safe">已修复</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ═══ 左栏：场景与输入 ═══ -->
+  <section>
+    <div class="panel">
+      <div class="panel-title"><span class="dot"></span>攻击场景</div>
+      <div class="panel-body" id="sceneList"></div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-title"><span class="dot"></span>漏洞开关状态 <span style="color:var(--muted);font-weight:400;font-size:11px" id="vulnCount"></span></div>
+      <div class="panel-body">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn" style="padding:6px;font-size:12px;background:#1e293b;color:var(--text)" onclick="setAllPatched(false)">全部切到脆弱实现</button>
+          <button class="btn" style="padding:6px;font-size:12px;background:#14532d;color:#bbf7d0" onclick="setAllPatched(true)">全部切到安全实现</button>
+        </div>
+        <div class="vuln-list" id="vulnList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 右栏：表单 + 结果 ═══ -->
+  <section>
+    <div class="panel">
+      <div class="panel-title"><span class="dot"></span>攻击输入</div>
+      <div class="panel-body" id="formArea"></div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-title"><span class="dot"></span>结果与证据</div>
+      <div class="panel-body" id="resultArea">
+        <div class="result-empty">
+          从左侧选择一个攻击场景，点击「发起攻击」。<br>
+          <span style="font-size:12px">
+            <span class="tag-gw">■ 网关层</span> 在入口做启发式预判；
+            <span class="tag-rasp">■ RASP 探针</span> 在 JDBC 执行点做 AST 结构指纹比对。
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  仅用于本地隔离环境的教学演示 · 所有漏洞均为主动构造 ·
+  判定依据可在 AEGIS 指挥中心 <span style="font-family:var(--mono)">localhost:5173</span> 查看
+</footer>
+
+<script>
+/* ══════════════════════════════════════════════
+   通道与全局状态
+   ══════════════════════════════════════════════ */
+const DIRECT = location.origin;                       // 页面本身所在的靶场地址
+const GATEWAY = DIRECT.replace(':8090', ':8000');     // 同机的网关地址
+let channel = 'gateway';
+let patched = false;
+let token = null;
+let currentUser = null;
+
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function client() { return channel === 'gateway' ? GATEWAY : DIRECT; }
+
+/* ══════════════════════════════════════════════
+   场景定义：与 tests/run_tests.py 的用例一一对应
+   ══════════════════════════════════════════════ */
+const SCENES = [
+  {
+    id: 'TC-01', name: 'SQL 注入 · 恒真式绕过登录', cvss: 9.8, sev: 'CRITICAL',
+    desc: '登录 SQL 由用户名参数拼接而来。注入 OR 恒真式 + 注释截断，跳过密码校验直接登录。',
+    api: 'POST /api/auth/login',
+    fields: [
+      { key: 'username', label: '用户名（注入点）', type: 'textarea', rows: 2, value: "admin' OR '1'='1' --" },
+      { key: 'password', label: '密码（随便填）', type: 'input', value: 'anything' }
+    ],
+    presets: {
+      username: [
+        "admin' OR '1'='1' --",
+        "admin'--",
+        "' OR 1=1 --",
+        "admin' OR '1'='2' --"
+      ]
+    },
+    kind: 'sqli'
+  },
+  {
+    id: 'TC-02', name: 'SQL 注入 · UNION 联合查询脱库', cvss: 9.1, sev: 'CRITICAL',
+    desc: '搜索接口拼接 keyword。UNION SELECT 把 users 表的口令哈希混进结果集，一次请求脱库。',
+    api: 'GET /api/notes/search?keyword=',
+    fields: [
+      { key: 'keyword', label: '搜索关键字（注入点）', type: 'textarea', rows: 2, value: "x%' UNION SELECT id, username, password_md5, role, phone FROM users --" }
+    ],
+    presets: {
+      keyword: [
+        "x%' UNION SELECT id, username, password_md5, role, phone FROM users --",
+        "x' UNION SELECT 1, 'leak', 'leak', 'leak', 'leak' FROM users --"
+      ]
+    },
+    kind: 'sqli'
+  },
+  {
+    id: 'TC-03', name: 'SQL 注入 · 注释截断剥离条件', cvss: 8.6, sev: 'HIGH',
+    desc: '详情接口拼接 id。注入引号闭合 + OR 恒真式，让 WHERE 条件对所有行成立，读取他人笔记。',
+    api: 'GET /api/notes/detail?id=',
+    fields: [
+      { key: 'id', label: '笔记 id（注入点）', type: 'input', value: "1' OR '1'='1" }
+    ],
+    kind: 'sqli'
+  },
+  {
+    id: 'TC-05', name: 'SQL 注入 · 时间盲注', cvss: 9.1, sev: 'CRITICAL',
+    desc: '注入 SLEEP()。页面是否长时间不返回，成为攻击者判断注入是否成立的"盲信道"。',
+    api: 'GET /api/notes/detail?id=',
+    fields: [
+      { key: 'id', label: '笔记 id（注入点）', type: 'input', value: "1' AND SLEEP(3) --" }
+    ],
+    kind: 'sqli'
+  },
+  {
+    id: 'TC-06', name: 'SQL 注入 · 堆叠查询', cvss: 9.1, sev: 'CRITICAL',
+    desc: '注入分号拼接第二条语句。H2 会拒绝 DROP，但攻击意图已经被 RASP 探针在语法树上抓到。',
+    api: 'GET /api/notes/detail?id=',
+    fields: [
+      { key: 'id', label: '笔记 id（注入点）', type: 'input', value: "1'; DROP TABLE notes_backup; --" }
+    ],
+    kind: 'sqli'
+  },
+  {
+    id: 'TC-08', name: '存储型 XSS · 事件属性注入', cvss: 8.2, sev: 'HIGH',
+    desc: '笔记内容原样入库、原样回显。提交携带 onerror 的 img 标签，浏览即触发。',
+    api: 'POST /api/notes/create',
+    fields: [
+      { key: 'title', label: '标题', type: 'input', value: '笔记XSS测试' },
+      { key: 'content', label: '内容（注入点）', type: 'textarea', rows: 2, value: '<img src=x onerror=alert(1)>' }
+    ],
+    presets: {
+      content: [
+        '<img src=x onerror=alert(1)>',
+        '<svg/onload=alert(1)>',
+        '<a href="javascript:alert(1)">点我</a>',
+        '<p>正常<strong>加粗</strong>内容</p>'
+      ]
+    },
+    kind: 'xss'
+  },
+  {
+    id: 'TC-11', name: '命令注入 · shell 元字符', cvss: 9.8, sev: 'CRITICAL',
+    desc: 'ping 诊断把主机名拼进 shell 命令。分号 / 反引号可以追加任意系统命令。',
+    api: 'POST /api/tools/ping',
+    fields: [
+      { key: 'host', label: '目标主机（注入点）', type: 'input', value: '127.0.0.1 && whoami' }
+    ],
+    presets: {
+      host: [
+        '127.0.0.1 && whoami',
+        '127.0.0.1 & echo PWNED',
+        '127.0.0.1; echo PWNED',
+        '`whoami`',
+        '127.0.0.1'
+      ]
+    },
+    kind: 'cmd'
+  },
+  {
+    id: 'TC-14', name: '路径穿越 · 任意文件读取', cvss: 7.5, sev: 'HIGH',
+    desc: '下载接口直接拼接文件名。../ 链可以跳出根目录，读走系统敏感文件。',
+    api: 'GET /api/tools/download?name=',
+    fields: [
+      { key: 'name', label: '文件名（注入点）', type: 'input', value: '../../../../etc/passwd' }
+    ],
+    presets: {
+      name: [
+        '../../../../etc/passwd',
+        'hello.txt',
+        '..%2f..%2f..%2f..%2fetc%2fpasswd'
+      ]
+    },
+    kind: 'path'
+  },
+  {
+    id: 'TC-12', name: '水平越权 (IDOR) · 读他人笔记', cvss: 8.1, sev: 'HIGH',
+    desc: '接口只认 ownerId 参数，不校验登录身份。改个数字就能遍历所有用户的私有笔记。',
+    api: 'GET /api/notes/list?ownerId=',
+    fields: [
+      { key: 'ownerId', label: 'OwnerId（遍历注入点）', type: 'input', value: '1' }
+    ],
+    presets: {
+      ownerId: ['1', '2', '3', '4']
+    },
+    kind: 'idor'
+  }
+];
+
+let activeScene = SCENES[0];
+
+/* ══════════════════════════════════════════════
+   场景列表渲染
+   ══════════════════════════════════════════════ */
+function renderScenes() {
+  $('#sceneList').innerHTML = SCENES.map(s => `
+    <div class="scene ${s.id === activeScene.id ? 'active' : ''}" data-id="${s.id}">
+      <div class="scene-head">
+        <span class="scene-id">${s.id}</span>
+        <span class="scene-name">${esc(s.name)}</span>
+        <span class="scene-cvss cvss-${s.sev}">${s.sev} ${s.cvss}</span>
+      </div>
+      <div class="scene-body">
+        ${esc(s.desc)}
+        <div class="api">${esc(s.api)}</div>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('.scene').forEach(el =>
+    el.addEventListener('click', () => {
+      activeScene = SCENES.find(s => s.id === el.dataset.id);
+      renderScenes(); renderForm();
+      $('#resultArea').innerHTML = emptyResult();
+    }));
+}
+
+/* ══════════════════════════════════════════════
+   表单渲染
+   ══════════════════════════════════════════════ */
+function renderForm() {
+  const s = activeScene;
+  const html = s.fields.map(f => {
+    let presetHtml = '';
+    if (s.presets && s.presets[f.key]) {
+      presetHtml = `<div class="presets">${s.presets[f.key].map(p =>
+        `<span class="preset" data-key="${f.key}" data-val="${esc(p)}">${esc(p.length > 42 ? p.slice(0, 42) + '…' : p)}</span>`).join('')}</div>`;
+    }
+    const control = f.type === 'textarea'
+      ? `<textarea id="f_${f.key}" rows="${f.rows || 2}">${esc(f.value)}</textarea>`
+      : `<input id="f_${f.key}" value="${esc(f.value)}">`;
+    return `<div class="field">
+      <label>${esc(f.label)}</label>
+      ${control}${presetHtml}
+    </div>`;
+  }).join('');
+
+  $('#formArea').innerHTML = html + `
+    <button class="btn btn-attack" id="fireBtn" onclick="fire()">⚡ 发起攻击</button>
+    <div class="hint" id="fireHint"></div>`;
+
+  document.querySelectorAll('.preset').forEach(el =>
+    el.addEventListener('click', () => {
+      const key = el.dataset.key;
+      const input = $('#f_' + key);
+      if (input) {
+        input.value = el.dataset.val;
+        input.focus();
+      }
+    }));
+
+  updateHint();
+}
+
+function updateHint() {
+  const ch = channel === 'gateway'
+    ? '<span class="tag-gw">经 AEGIS 网关（:8000）</span>，网关与 RASP 探针两层防护均生效'
+    : '<span style="color:#f87171">直连靶场（:8090）</span>，跳过网关，仅 RASP 探针在进程内防护';
+  const im = patched
+    ? '靶场运行<b style="color:#4ade80">安全实现</b>（PreparedStatement / 白名单），预期攻击失效'
+    : '靶场运行<b style="color:#f87171">脆弱实现</b>（字符串拼接），预期攻击得手';
+  $('#fireHint').innerHTML = `当前路径：${ch}；${im}。`;
+}
+
+function emptyResult() {
+  return `<div class="result-empty">
+    从左侧选择一个攻击场景，点击「发起攻击」。<br>
+    <span style="font-size:12px">
+      <span class="tag-gw">■ 网关层</span> 在入口做启发式预判；
+      <span class="tag-rasp">■ RASP 探针</span> 在 JDBC 执行点做 AST 结构指纹比对。
+    </span>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   请求执行
+   ══════════════════════════════════════════════ */
+async function api(method, path, body, auth) {
+  const headers = { 'Content-Type': 'application/json; charset=utf-8' };
+  if (auth && token) headers['Authorization'] = 'Bearer ' + token;
+  let url = client() + path;
+  const opt = { method, headers };
+  if (body) opt.body = JSON.stringify(body);
+  const started = performance.now();
+  try {
+    const resp = await fetch(url, opt);
+    const text = await resp.text();
+    let json = {}; try { json = JSON.parse(text); } catch { json = { raw: text }; }
+    return { status: resp.status, ok: resp.ok, json, ms: Math.round(performance.now() - started),
+             headers: Object.fromEntries(resp.headers.entries()) };
+  } catch (e) {
+    return { status: -1, ok: false, json: { raw: String(e) }, ms: Math.round(performance.now() - started), headers: {} };
+  }
+}
+
+async function fire() {
+  const s = activeScene;
+  const btn = $('#fireBtn');
+  btn.disabled = true; btn.textContent = '⏳ 攻击请求已发出…';
+  try {
+    let r;
+    if (s.id === 'TC-01') {
+      r = await api('POST', '/api/auth/login', {
+        username: val('username'), password: val('password')
+      });
+      renderLoginResult(r);
+    } else if (s.id === 'TC-02') {
+      r = await api('GET', '/api/notes/search?keyword=' + encodeURIComponent(val('keyword')));
+      renderSearchResult(r, val('keyword'));
+    } else if (s.id === 'TC-03' || s.id === 'TC-05' || s.id === 'TC-06') {
+      r = await api('GET', '/api/notes/detail?id=' + encodeURIComponent(val('id')));
+      renderDetailResult(r, val('id'));
+    } else if (s.id === 'TC-08') {
+      r = await api('POST', '/api/notes/create', {
+        title: val('title'), content: val('content')
+      }, true);
+      await renderXssResult(r, val('content'));
+    } else if (s.id === 'TC-11') {
+      r = await api('POST', '/api/tools/ping', { host: val('host') });
+      renderCmdResult(r, val('host'));
+    } else if (s.id === 'TC-14') {
+      r = await api('GET', '/api/tools/download?name=' + encodeURIComponent(val('name')));
+      renderPathResult(r, val('name'));
+    } else if (s.id === 'TC-12') {
+      r = await api('GET', '/api/notes/list?ownerId=' + encodeURIComponent(val('ownerId')), null, true);
+      renderIdorResult(r, val('ownerId'));
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ 发起攻击';
+  }
+}
+
+const val = key => { const el = $('#f_' + key); return el ? el.value.trim() : ''; };
+
+/* ══════════════════════════════════════════════
+   判定与渲染
+   ══════════════════════════════════════════════ */
+function classify(r) {
+  const j = r.json;
+  if (j.blocked && j.by === 'AEGIS Gateway')
+    return { cls: 'blocked', icon: '🛡', title: '被 AEGIS 网关拦截',
+             sub: `启发式预判命中 · ${r.status} · 耗时 ${r.ms}ms` };
+  if (j.blocked && (j.by === 'AEGIS RASP' || j.layer === 'RASP'))
+    return { cls: 'blocked', icon: '🛡', title: '被 AEGIS RASP 探针拦截',
+             sub: `JDBC/进程执行点确定性判定 · ${r.status} · 耗时 ${r.ms}ms` };
+  if (j.blocked)
+    return { cls: 'blocked', icon: '🛡', title: '被 AEGIS 拦截', sub: `${r.status} · 耗时 ${r.ms}ms` };
+  // MONITOR 模式：探针只记录不阻断，响应文本中携带拦截说明
+  if (typeof j.output === 'string' && j.output.includes('AEGIS 已拦截'))
+    return { cls: 'blocked', icon: '👁', title: 'AEGIS 探针已检出（MONITOR 只记录不阻断）',
+             sub: `${r.status} · 耗时 ${r.ms}ms · 切到 BLOCK 模式即可阻断` };
+  if (j.success === false && (r.status === 401 || r.status === 403 || r.status === 400 || r.status === 429))
+    return { cls: 'safe', icon: '✓', title: '请求被拒绝（代码层防护生效）',
+             sub: `${r.status} · 耗时 ${r.ms}ms · 实现层拒绝` };
+  if (j.success === true && j.implementation === 'SAFE')
+    return { cls: 'safe', icon: '✓', title: '攻击未奏效（安全实现）',
+             sub: `${r.status} · 耗时 ${r.ms}ms · 运行的是已修复代码` };
+  if (j.success === true)
+    return { cls: 'hit', icon: '💥', title: '攻击得手（漏洞被触发）',
+             sub: `${r.status} · 耗时 ${r.ms}ms · 运行的是脆弱实现` };
+  return { cls: 'normal', icon: '•', title: `响应 ${r.status}`, sub: `耗时 ${r.ms}ms` };
+}
+
+function verdictHtml(v) {
+  return `<div class="verdict ${v.cls}">
+    <h3>${v.icon} ${esc(v.title)}</h3>
+    <div class="meta">${esc(v.sub)}</div>
+  </div>`;
+}
+
+function sqlPreview(sql, injPart) {
+  let html = esc(sql);
+  if (injPart) {
+    const idx = sql.indexOf(injPart);
+    if (idx >= 0) {
+      html = esc(sql.slice(0, idx))
+        + `<span class="inj">${esc(injPart)}</span>`
+        + esc(sql.slice(idx + injPart.length));
+    }
+  }
+  return `<div class="sql-box"><div class="cap">▸ 拼接生成的真实 SQL（红色部分为注入引入的结构）</div>${html}</div>`;
+}
+
+function jsonBox(obj) {
+  return `<pre class="json">${esc(typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2))}</pre>`;
+}
+
+/* ── TC-01 登录绕过 ── */
+function renderLoginResult(r) {
+  const v = classify(r);
+  const user = r.json.user;
+  let extra = '';
+  if (v.cls === 'hit' && user) {
+    token = r.json.token; currentUser = user;
+    extra = `<table class="data">
+      <tr><th colspan="2" style="color:#f87171">🔓 以「${esc(user.username)}」（${esc(user.role)}）身份登录成功 —— 密码是随便填的</th></tr>
+      <tr><td style="color:var(--muted)">user id</td><td>${user.id}</td></tr>
+      <tr><td style="color:var(--muted)">username</td><td>${esc(user.username)}</td></tr>
+      <tr><td style="color:var(--muted)">role</td><td>${esc(user.role)}</td></tr>
+    </table>`;
+  }
+  const sql = `SELECT id, username, email, role, phone FROM users
+  WHERE username = '<span class="str">${esc(val('username'))}</span>' AND password_md5 = '...'`;
+  $('#resultArea').innerHTML =
+    verdictHtml(v)
+    + (v.cls === 'hit' ? sqlPreview(
+        `SELECT id, username, email, role, phone FROM users WHERE username='${val('username')}' AND password_md5='…'`,
+        val('username')) : '')
+    + extra
+    + jsonBox(r.json);
+}
+
+/* ── TC-02 UNION 脱库 ── */
+function renderSearchResult(r, kw) {
+  const v = classify(r);
+  let table = '';
+  const rows = r.json.data || [];
+  if (v.cls === 'hit' && rows.length) {
+    const isLeak = /union/i.test(kw);
+    table = `<table class="data">
+      <tr><th>id</th><th>owner_id</th><th>title</th><th>content</th></tr>
+      ${rows.slice(0, 12).map(n => `<tr>
+        <td>${n.id}</td><td>${n.ownerId}</td>
+        <td class="${isLeak && n.ownerId == null ? 'leak' : ''}">${esc(n.title)}</td>
+        <td class="${isLeak && n.ownerId == null ? 'leak' : ''}">${esc(String(n.content ?? ''))}</td>
+      </tr>`).join('')}
+    </table>
+    ${isLeak ? `<div class="hint">💣 UNION 注入把 <b>users 表的用户名与口令哈希</b>混进了笔记结果集 —— 这就是"脱库"。</div>` : ''}`;
+  }
+  $('#resultArea').innerHTML =
+    verdictHtml(v)
+    + (v.cls === 'hit' ? sqlPreview(
+        `SELECT id, owner_id, title, content, visibility, created_at FROM notes WHERE title LIKE '%${kw}%'`,
+        kw) : '')
+    + table
+    + jsonBox(r.json);
+}
+
+/* ── TC-03/05/06 详情类注入 ── */
+function renderDetailResult(r, inj) {
+  const v = classify(r);
+  const d = r.json.data;
+  let extra = '';
+  if (v.cls === 'hit' && d) {
+    extra = `<table class="data">
+      <tr><th colspan="2" style="color:#f87171">🔓 拿到了笔记 #${d.id}（属于用户 ${d.ownerId}）</th></tr>
+      <tr><td style="color:var(--muted)">title</td><td>${esc(d.title)}</td></tr>
+      <tr><td style="color:var(--muted)">content</td><td>${esc(String(d.content ?? ''))}</td></tr>
+    </table>`;
+    if (/SLEEP/i.test(inj)) {
+      extra += `<div class="hint">⏱ 时间盲注生效：请求耗时 <b>${r.ms}ms</b>${r.ms > 2500 ? '（远超正常值，数据库确实执行了 SLEEP）' : ''}。</div>`;
+    }
+    if (/DROP/i.test(inj)) {
+      extra += `<div class="hint">🧨 堆叠查询：H2 拒绝了 DROP（无该表），但"第二条语句"这个结构已经被探针看到。</div>`;
+    }
+  }
+  $('#resultArea').innerHTML =
+    verdictHtml(v)
+    + (v.cls !== 'blocked' ? sqlPreview(
+        `SELECT id, owner_id, title, content, visibility, created_at FROM notes WHERE id = '${inj}'`,
+        inj.replace(/^\d+'?/, '')) : '')
+    + extra
+    + jsonBox(r.json);
+}
+
+/* ── TC-08 存储型 XSS ── */
+async function renderXssResult(r, content) {
+  const v = classify(r);
+  let html = verdictHtml(v);
+  if (r.json.id && v.cls === 'hit') {
+    // 攻击入库成功 → 立即回读渲染，演示"浏览即触发"
+    const back = await api('GET', '/api/notes/detail?id=' + r.json.id, null, true);
+    const raw = back.json.data ? back.json.data.content : content;
+    html += `<div class="xss-wall">
+      <div class="cap">▸ 模拟受害者浏览该笔记（vuln 实现原样回显，下方即为 HTML 渲染结果）</div>
+      <div class="note-view" id="xssView"></div>
+      <div class="hint" style="margin-top:8px">
+        载荷已入库。在脆弱实现下它原样回显——若含 <span style="font-family:var(--mono)">onerror/onload</span> 即在受害者浏览器执行。
+        AEGIS 的净化版输出见下方 JSON。
+      </div>
+    </div>`;
+    html += jsonBox(r.json);
+    $('#resultArea').innerHTML = html;
+    const view = $('#xssView');
+    if (view) {
+      view.innerHTML = raw;   // 有意为之：演示原样回显的危险性（本地隔离环境）
+      if (/onerror|onload|javascript:/i.test(raw)) view.classList.add('flash');
+    }
+    return;
+  }
+  if (v.cls === 'safe' || v.cls === 'blocked') {
+    html += `<div class="hint">净化/拦截后，危险标签与属性不会进入存储，更不会回显到受害者页面。</div>`;
+  }
+  html += jsonBox(r.json);
+  $('#resultArea').innerHTML = html;
+}
+
+/* ── TC-11 命令注入 ── */
+function renderCmdResult(r, host) {
+  const v = classify(r);
+  let extra = '';
+  if (v.cls === 'hit' && r.json.output) {
+    const isWin = navigator.userAgent.includes('Windows');
+    const pwned = /PWNED|whoami|root|uid=|本机[^\\s]*\\/|tudu/i.test(r.json.output);
+    extra = `<div class="sql-box ${pwned ? 'flash' : ''}">
+      <div class="cap">▸ 拼接生成的 shell 命令（${isWin ? 'Windows: cmd /c' : 'Unix: sh -c'}）</div>
+      ${esc((isWin ? 'cmd /c ping -n 1 ' : 'sh -c "ping -c 1 ') + host + (isWin ? '' : '"'))}
+    </div>
+    <pre class="json">${esc(r.json.output)}</pre>
+    ${pwned ? '<div class="hint">💥 追加的命令被执行，输出已经回流——这是完整的命令注入链。</div>' : ''}`;
+  }
+  $('#resultArea').innerHTML = verdictHtml(v) + extra + jsonBox(r.json);
+}
+
+/* ── TC-14 路径穿越 ── */
+function renderPathResult(r, name) {
+  const v = classify(r);
+  let extra = '';
+  if (v.cls === 'hit' && r.json.content) {
+    extra = `<div class="sql-box flash">
+      <div class="cap">▸ 被读取的文件内容</div>${esc(r.json.content.slice(0, 800))}
+    </div>
+    <div class="hint">📂 路径 ${esc(name)} 跳出了下载根目录，读到了不该读的文件。</div>`;
+  }
+  $('#resultArea').innerHTML = verdictHtml(v) + extra + jsonBox(r.json);
+}
+
+/* ── TC-12 IDOR ── */
+function renderIdorResult(r, ownerId) {
+  const v = classify(r);
+  let table = '';
+  const rows = r.json.data || [];
+  if (v.cls === 'hit' && rows.length) {
+    table = `<table class="data">
+      <tr><th>id</th><th>ownerId</th><th>title</th><th>visibility</th></tr>
+      ${rows.slice(0, 12).map(n => `<tr>
+        <td>${n.id}</td><td>${n.ownerId}</td><td>${esc(n.title)}</td>
+        <td class="${n.visibility === 'PRIVATE' ? 'leak' : ''}">${esc(n.visibility)}</td>
+      </tr>`).join('')}
+    </table>
+    <div class="hint">🔓 无需任何凭据，仅凭 ownerId=${esc(ownerId)} 就列出了该用户的<b>私有笔记</b>（红色行）。</div>`;
+  }
+  $('#resultArea').innerHTML = verdictHtml(v) + table + jsonBox(r.json);
+}
+
+/* ══════════════════════════════════════════════
+   漏洞开关面板
+   ══════════════════════════════════════════════ */
+async function refreshVulnStatus() {
+  const r = await api('GET', '/api/vuln/status');
+  if (!r.json.vulnerabilities) return;
+  const entries = Object.values(r.json.vulnerabilities);
+  const patchedCount = entries.filter(e => e.patched).length;
+  $('#vulnCount').textContent = `（${patchedCount}/${entries.length} 已修复）`;
+  $('#vulnList').innerHTML = entries.map(e => `
+    <div class="vuln-item">
+      <span class="vid">${e.id}</span>
+      <span class="vname">${esc(e.name)}</span>
+      <span class="status-pill ${e.patched ? 'fixed' : 'vuln'}">${e.patched ? '已修复' : '脆弱'}</span>
+    </div>`).join('');
+}
+
+async function setAllPatched(v) {
+  await api('POST', '/api/vuln/toggle-all', { patched: v });
+  patched = v;
+  syncToggles(); refreshVulnStatus(); updateHint();
+}
+
+/* ══════════════════════════════════════════════
+   顶部开关
+   ══════════════════════════════════════════════ */
+function syncToggles() {
+  document.querySelectorAll('#channelToggle button').forEach(b => {
+    b.classList.toggle('on', b.dataset.v === channel);
+    b.classList.toggle('red', b.dataset.v === channel && channel === 'gateway');
+  });
+  document.querySelectorAll('#patchToggle button').forEach(b => {
+    b.classList.toggle('on', b.dataset.v === (patched ? 'safe' : 'vuln'));
+    b.classList.toggle('red', b.dataset.v === 'vuln' && !patched);
+    b.classList.toggle('green', b.dataset.v === 'safe' && patched);
+  });
+}
+
+document.querySelectorAll('#channelToggle button').forEach(b =>
+  b.addEventListener('click', () => { channel = b.dataset.v; syncToggles(); updateHint(); }));
+document.querySelectorAll('#patchToggle button').forEach(b =>
+  b.addEventListener('click', async () => {
+    const want = b.dataset.v === 'safe';
+    await api('POST', '/api/vuln/toggle-all', { patched: want });
+    patched = want; syncToggles(); refreshVulnStatus(); updateHint();
+  }));
+
+/* ══════════════════════════════════════════════
+   初始化
+   ══════════════════════════════════════════════ */
+(async function init() {
+  renderScenes(); renderForm(); syncToggles();
+  const st = await api('GET', '/api/vuln/status');
+  if (st.json.vulnerabilities) {
+    const vals = Object.values(st.json.vulnerabilities);
+    patched = vals.every(e => e.patched);
+    syncToggles(); updateHint();
+  }
+  refreshVulnStatus();
+  // 预热：用正常凭据登录一次，拿到演示用 token（alice / password123）
+  const login = await api('POST', '/api/auth/login',
+    { username: 'alice', password: 'password123' });
+  if (login.json.token) token = login.json.token;
+})();
+</script>
+</body>
+</html>

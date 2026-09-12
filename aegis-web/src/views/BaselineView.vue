@@ -316,7 +316,7 @@ function formatTime(ts) {
     width: 18px;
     height: 18px;
     border-radius: $r-full;
-    background: #fff;
+    background: #e6eaf0;
     box-shadow: $shadow-xs;
     transition: transform $dur-normal $ease-spring;
   }

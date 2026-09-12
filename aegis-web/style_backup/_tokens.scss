@@ -1,0 +1,154 @@
+// ============================================================
+// AEGIS 设计令牌
+//
+// 设计定位：明亮 · 清新 · 精密 · 克制
+// 参照现代 SaaS 产品（Linear / Stripe / Vercel）的视觉语言，
+// 以浅色为基底，通过细腻的层次、柔和的阴影与克制的动效
+// 营造专业而不压抑的安全指挥中心氛围。
+// ============================================================
+
+// ---------- 背景层次（五级，由浅入深营造纵深）----------
+$bg-canvas:      #F7F9FC;   // 页面画布，带一丝冷调的白
+$bg-surface:     #FFFFFF;   // 卡片表面
+$bg-subtle:      #F2F5F9;   // 次级区块、表头
+$bg-muted:       #E8EDF4;   // 分隔区域
+$bg-hover:       #EFF4FA;   // 悬停态
+
+// ---------- 主色：静谧蓝（专业、可信、不刺眼）----------
+$primary-50:     #EFF6FF;
+$primary-100:    #DBEAFE;
+$primary-200:    #BFDBFE;
+$primary-300:    #93C5FD;
+$primary-400:    #60A5FA;
+$primary-500:    #3B82F6;   // 主色
+$primary-600:    #2563EB;   // 主色-深（按钮、强调）
+$primary-700:    #1D4ED8;
+$primary-glow:   rgba(59, 130, 246, 0.16);
+
+// ---------- 辅助色：青碧（用于"安全/正常"语义）----------
+$teal-50:        #ECFDF5;
+$teal-100:       #D1FAE5;
+$teal-400:       #34D399;
+$teal-500:       #10B981;
+$teal-600:       #059669;
+
+// ---------- 语义色：威胁等级 ----------
+// 浅色背景下降低饱和度与明度，避免刺目，同时保证辨识度
+$critical:       #E11D48;   // 严重 - 玫红
+$critical-bg:    #FFF1F2;
+$critical-border:#FECDD3;
+
+$high:           #EA580C;   // 高危 - 橙
+$high-bg:        #FFF7ED;
+$high-border:    #FED7AA;
+
+$medium:         #D97706;   // 中危 - 琥珀
+$medium-bg:      #FFFBEB;
+$medium-border:  #FDE68A;
+
+$low:            #0891B2;   // 低危 - 青
+$low-bg:         #ECFEFF;
+$low-border:     #A5F3FC;
+
+$safe:           #059669;   // 安全 - 绿
+$safe-bg:        #ECFDF5;
+$safe-border:    #A7F3D0;
+
+$info:           #4F46E5;   // 信息 - 靛
+$info-bg:        #EEF2FF;
+$info-border:    #C7D2FE;
+
+// ---------- 中性色（文本与边框）----------
+$text-primary:   #0F172A;   // 主文本，近黑但不纯黑
+$text-secondary: #475569;   // 次要文本
+$text-tertiary:  #94A3B8;   // 弱化文本、占位
+$text-inverse:   #FFFFFF;
+
+$border-subtle:  #EDF1F7;   // 极细分隔线
+$border-default: #E2E8F0;   // 常规边框
+$border-strong:  #CBD5E1;   // 强调边框
+
+// ---------- 渐变 ----------
+$grad-primary:   linear-gradient(135deg, #3B82F6 0%, #6366F1 100%);
+$grad-teal:      linear-gradient(135deg, #10B981 0%, #06B6D4 100%);
+$grad-critical:  linear-gradient(135deg, #F43F5E 0%, #E11D48 100%);
+$grad-surface:   linear-gradient(160deg, #FFFFFF 0%, #FAFCFF 100%);
+$grad-canvas:    linear-gradient(180deg, #F7F9FC 0%, #EEF3FA 100%);
+
+// ---------- 字体 ----------
+$font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+            'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+            'Helvetica Neue', sans-serif;
+
+$font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas',
+            'Liberation Mono', monospace;
+
+// 等宽数字：保证指标跳动时宽度稳定，是专业感的关键细节
+@mixin numeric {
+  font-family: $font-mono;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+  letter-spacing: -0.02em;
+}
+
+// 字号阶梯
+$fs-display: 40px;
+$fs-h1:      28px;
+$fs-h2:      22px;
+$fs-h3:      17px;
+$fs-body:    14px;
+$fs-small:   13px;
+$fs-caption: 12px;
+$fs-micro:   11px;
+
+// 字重
+$fw-normal:   400;
+$fw-medium:   500;
+$fw-semibold: 600;
+$fw-bold:     700;
+
+// ---------- 间距（4px 基准栅格）----------
+$sp-1:  4px;   $sp-2:  8px;   $sp-3:  12px;  $sp-4:  16px;
+$sp-5:  20px;  $sp-6:  24px;  $sp-8:  32px;  $sp-10: 40px;
+$sp-12: 48px;  $sp-16: 64px;
+
+// ---------- 圆角 ----------
+// 浅色设计中适度增大圆角以获得柔和感，但不过分（避免消费级观感）
+$r-xs:   4px;
+$r-sm:   6px;
+$r-md:   10px;
+$r-lg:   14px;
+$r-xl:   18px;
+$r-full: 999px;
+
+// ---------- 阴影（浅色设计的层次核心）----------
+// 采用多层叠加的柔和阴影，模拟真实的环境光遮蔽
+$shadow-xs:   0 1px 2px rgba(15, 23, 42, 0.04);
+$shadow-sm:   0 1px 3px rgba(15, 23, 42, 0.06),
+              0 1px 2px rgba(15, 23, 42, 0.04);
+$shadow-md:   0 4px 12px rgba(15, 23, 42, 0.06),
+              0 2px 4px rgba(15, 23, 42, 0.04);
+$shadow-lg:   0 12px 28px rgba(15, 23, 42, 0.08),
+              0 4px 10px rgba(15, 23, 42, 0.04);
+$shadow-xl:   0 24px 48px rgba(15, 23, 42, 0.10),
+              0 8px 16px rgba(15, 23, 42, 0.05);
+$shadow-primary: 0 6px 20px rgba(59, 130, 246, 0.20);
+$shadow-critical: 0 6px 20px rgba(225, 29, 72, 0.20);
+
+// ---------- 动效 ----------
+// 全部使用自定义缓动，禁用 linear 与浏览器默认 ease
+$ease-out:    cubic-bezier(0.16, 1, 0.3, 1);       // 元素进入：快进慢出
+$ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);      // 状态切换
+$ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   // 强调：轻微回弹
+
+$dur-instant: 120ms;
+$dur-fast:    200ms;
+$dur-normal:  280ms;
+$dur-slow:    420ms;
+$dur-slower:  600ms;
+
+// ---------- 布局 ----------
+$sidebar-width:          232px;
+$sidebar-width-collapsed: 72px;
+$topbar-height:          64px;
+$content-max-width:      1680px;

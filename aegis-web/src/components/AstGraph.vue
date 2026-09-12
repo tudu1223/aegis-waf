@@ -39,7 +39,7 @@ const STYLE = {
   },
   root: {
     fill: '#EEF2FF',
-    stroke: '#6366F1',
+    stroke: '#6d5dfc',
     text: '#3730A3'
   }
 }
@@ -208,11 +208,11 @@ function render() {
     defaultEdge: {
       type: 'cubic-horizontal',
       style: {
-        stroke: '#CBD5E1',
+        stroke: '#B8BEC9',
         lineWidth: 1.1,
         endArrow: {
           path: G6.Arrow.triangle(4, 5, 0),
-          fill: '#CBD5E1',
+          fill: '#B8BEC9',
           d: 0
         }
       }
@@ -234,11 +234,11 @@ function render() {
     const injected = target?.getModel?.().injected
     return {
       style: {
-        stroke: injected ? '#FB7185' : '#CBD5E1',
+        stroke: injected ? '#FB7185' : '#B8BEC9',
         lineWidth: injected ? 1.8 : 1.1,
         endArrow: {
           path: G6.Arrow.triangle(4, 5, 0),
-          fill: injected ? '#FB7185' : '#CBD5E1',
+          fill: injected ? '#FB7185' : '#B8BEC9',
           d: 0
         }
       }
@@ -368,7 +368,7 @@ defineExpose({
     align-items: center;
     gap: $sp-4;
     padding: $sp-2 $sp-3;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(224, 229, 236, 0.92);
     backdrop-filter: blur(8px);
     border: 1px solid $border-subtle;
     border-radius: $r-full;

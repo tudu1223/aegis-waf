@@ -92,10 +92,16 @@ public final class CommandInjectionDetector {
         }
 
         // 判定三：敏感命令检测
-        String detectedSensitive = findSensitiveCommand(normalized);
+        // [关键] 只在元字符之后的"追加命令"里找敏感词，而非整条命令文本。
+        // 业务自身经 shell 执行（如 cmd /c ping）时，可执行程序名 cmd 属于
+        // 正常调用形态；命令注入的本质是元字符之后追加了攻击者命令，
+        // 因此敏感命令必须出现在元字符之后才算注入证据。
+        // 若在全文匹配，正常 ping 会因 shellParsed(30)+cmd(35)=65 被误拦。
+        String tail = textAfterFirstMetachar(normalized);
+        String detectedSensitive = findSensitiveCommand(tail);
         if (detectedSensitive != null) {
             score += 35;
-            evidence.add("调用了敏感命令: " + detectedSensitive);
+            evidence.add("元字符后追加了敏感命令: " + detectedSensitive);
         }
 
         // 判定四：敏感文件访问
@@ -206,6 +212,25 @@ public final class CommandInjectionDetector {
             }
         }
         return found;
+    }
+
+    /** 截取首个 shell 元字符之后的文本；无元字符时返回空串。 */
+    private static String textAfterFirstMetachar(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (isMetachar(text.charAt(i))) {
+                return text.substring(i + 1);
+            }
+        }
+        return "";
+    }
+
+    private static boolean isMetachar(char c) {
+        for (char m : SHELL_METACHARACTERS) {
+            if (m == c) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String findSensitiveCommand(String text) {

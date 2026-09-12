@@ -1,79 +1,78 @@
 // ============================================================
-// AEGIS 设计令牌
+// AEGIS 设计令牌 · Neumorphism (Soft UI) 版
 //
-// 设计定位：明亮 · 清新 · 精密 · 克制
-// 参照现代 SaaS 产品（Linear / Stripe / Vercel）的视觉语言，
-// 以浅色为基底，通过细腻的层次、柔和的阴影与克制的动效
-// 营造专业而不压抑的安全指挥中心氛围。
+// 设计定位：新拟物派 —— 元素从 #e0e5ec 的类粘土表面"挤压/凹陷"而来，
+// 双重阴影（左上高光 #ffffff / 右下暗影 #b8bcc2）模拟固定左上光源。
+// 仅改动视觉层；所有变量名与原版保持一致，引用方零改动。
 // ============================================================
 
-// ---------- 背景层次（五级，由浅入深营造纵深）----------
-$bg-canvas:      #F7F9FC;   // 页面画布，带一丝冷调的白
-$bg-surface:     #FFFFFF;   // 卡片表面
-$bg-subtle:      #F2F5F9;   // 次级区块、表头
-$bg-muted:       #E8EDF4;   // 分隔区域
-$bg-hover:       #EFF4FA;   // 悬停态
+// ---------- 背景层次（新拟物：单一浅灰同色系）----------
+$bg-canvas:      #e0e5ec;   // 页面画布 = 材质表面
+$bg-surface:     #e0e5ec;   // 卡片表面与画布同色（拟物核心： seamless）
+$bg-subtle:      #e6eaf0;   // 次级区块、表头（极浅一档）
+$bg-muted:       #d6dbe3;   // 分隔区域（深一档）
+$bg-hover:       #e4e9f0;   // 悬停态
 
-// ---------- 主色：静谧蓝（专业、可信、不刺眼）----------
-$primary-50:     #EFF6FF;
-$primary-100:    #DBEAFE;
-$primary-200:    #BFDBFE;
-$primary-300:    #93C5FD;
-$primary-400:    #60A5FA;
-$primary-500:    #3B82F6;   // 主色
-$primary-600:    #2563EB;   // 主色-深（按钮、强调）
-$primary-700:    #1D4ED8;
-$primary-glow:   rgba(59, 130, 246, 0.16);
+// ---------- 主色：强调紫（新拟物 token #6d5dfc）----------
+$primary-50:     #F0EEFE;
+$primary-100:    #E2DEFC;
+$primary-200:    #C6BFF9;
+$primary-300:    #A79EF6;
+$primary-400:    #8A7DF9;
+$primary-500:    #6d5dfc;   // 主强调色
+$primary-600:    #5b4be0;   // 深一档
+$primary-700:    #4a3dc4;
+$primary-glow:   rgba(109, 93, 252, 0.16);
 
-// ---------- 辅助色：青碧（用于"安全/正常"语义）----------
-$teal-50:        #ECFDF5;
-$teal-100:       #D1FAE5;
-$teal-400:       #34D399;
-$teal-500:       #10B981;
-$teal-600:       #059669;
+// ---------- 辅助色：青碧（安全/正常语义，降饱和以融入浅底）----------
+$teal-50:        #E8F6F1;
+$teal-100:       #D2EDE3;
+$teal-400:       #3FBF96;
+$teal-500:       #2FA57F;
+$teal-600:       #238A69;
 
-// ---------- 语义色：威胁等级 ----------
-// 浅色背景下降低饱和度与明度，避免刺目，同时保证辨识度
-$critical:       #E11D48;   // 严重 - 玫红
-$critical-bg:    #FFF1F2;
-$critical-border:#FECDD3;
+// ---------- 语义色：威胁等级（浅灰底上保持可读的中饱和色）----------
+$critical:       #D64562;   // 严重
+$critical-bg:    #F5E3E8;
+$critical-border:#E8C7D0;
 
-$high:           #EA580C;   // 高危 - 橙
-$high-bg:        #FFF7ED;
-$high-border:    #FED7AA;
+$high:           #D97E3A;   // 高危
+$high-bg:        #F5EBE0;
+$high-border:    #E8D5BE;
 
-$medium:         #D97706;   // 中危 - 琥珀
-$medium-bg:      #FFFBEB;
-$medium-border:  #FDE68A;
+$medium:         #C9A03C;   // 中危
+$medium-bg:      #F5EFE0;
+$medium-border:  #E8DDBE;
 
-$low:            #0891B2;   // 低危 - 青
-$low-bg:         #ECFEFF;
-$low-border:     #A5F3FC;
+$low:            #4E9DB0;   // 低危
+$low-bg:         #E2F0F4;
+$low-border:     #C4DFE7;
 
-$safe:           #059669;   // 安全 - 绿
-$safe-bg:        #ECFDF5;
-$safe-border:    #A7F3D0;
+$safe:           #4FA97C;   // 安全
+$safe-bg:        #E4F1EA;
+$safe-border:    #C6E2D3;
 
-$info:           #4F46E5;   // 信息 - 靛
-$info-bg:        #EEF2FF;
-$info-border:    #C7D2FE;
+$info:           #7A6EE0;   // 信息
+$info-bg:        #EBE9FA;
+$info-border:    #D4CFF4;
 
-// ---------- 中性色（文本与边框）----------
-$text-primary:   #0F172A;   // 主文本，近黑但不纯黑
-$text-secondary: #475569;   // 次要文本
-$text-tertiary:  #94A3B8;   // 弱化文本、占位
+// ---------- 中性色（文本；新拟物不用边框，用阴影分隔）----------
+$text-primary:   #333333;   // 主文本（token 规定）
+$text-secondary: #6b7280;   // 次要文本（token 规定）
+$text-tertiary:  #9AA3B0;   // 弱化文本、占位
 $text-inverse:   #FFFFFF;
 
-$border-subtle:  #EDF1F7;   // 极细分隔线
-$border-default: #E2E8F0;   // 常规边框
-$border-strong:  #CBD5E1;   // 强调边框
+// 边框：新拟物禁用可见边框，全部置透明（保留变量避免引用方报错）
+$border-subtle:  transparent;
+$border-default: transparent;
+$border-strong:  #cdd3dc;   // 仅用于滚动条等非"分隔线"场景
 
-// ---------- 渐变 ----------
-$grad-primary:   linear-gradient(135deg, #3B82F6 0%, #6366F1 100%);
-$grad-teal:      linear-gradient(135deg, #10B981 0%, #06B6D4 100%);
-$grad-critical:  linear-gradient(135deg, #F43F5E 0%, #E11D48 100%);
-$grad-surface:   linear-gradient(160deg, #FFFFFF 0%, #FAFCFF 100%);
-$grad-canvas:    linear-gradient(180deg, #F7F9FC 0%, #EEF3FA 100%);
+// ---------- 渐变：新拟物禁用渐变，全部替换为同色实底 ----------
+$grad-primary:   #6d5dfc;
+$grad-teal:      #2FA57F;
+$grad-critical:  #D64562;
+$grad-surface:   #e0e5ec;
+$grad-canvas:    #e0e5ec;
 
 // ---------- 字体 ----------
 $font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
@@ -83,7 +82,7 @@ $font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
 $font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas',
             'Liberation Mono', monospace;
 
-// 等宽数字：保证指标跳动时宽度稳定，是专业感的关键细节
+// 等宽数字
 @mixin numeric {
   font-family: $font-mono;
   font-variant-numeric: tabular-nums;
@@ -107,47 +106,49 @@ $fw-medium:   500;
 $fw-semibold: 600;
 $fw-bold:     700;
 
-// ---------- 间距（4px 基准栅格）----------
+// ---------- 间距（4px 基准栅格，保持不变）----------
 $sp-1:  4px;   $sp-2:  8px;   $sp-3:  12px;  $sp-4:  16px;
 $sp-5:  20px;  $sp-6:  24px;  $sp-8:  32px;  $sp-10: 40px;
 $sp-12: 48px;  $sp-16: 64px;
 
-// ---------- 圆角 ----------
-// 浅色设计中适度增大圆角以获得柔和感，但不过分（避免消费级观感）
-$r-xs:   4px;
-$r-sm:   6px;
-$r-md:   10px;
-$r-lg:   14px;
-$r-xl:   18px;
+// ---------- 圆角（新拟物：12-24px 中大圆角）----------
+$r-xs:   8px;
+$r-sm:   10px;
+$r-md:   12px;
+$r-lg:   16px;
+$r-xl:   20px;
 $r-full: 999px;
 
-// ---------- 阴影（浅色设计的层次核心）----------
-// 采用多层叠加的柔和阴影，模拟真实的环境光遮蔽
-$shadow-xs:   0 1px 2px rgba(15, 23, 42, 0.04);
-$shadow-sm:   0 1px 3px rgba(15, 23, 42, 0.06),
-              0 1px 2px rgba(15, 23, 42, 0.04);
-$shadow-md:   0 4px 12px rgba(15, 23, 42, 0.06),
-              0 2px 4px rgba(15, 23, 42, 0.04);
-$shadow-lg:   0 12px 28px rgba(15, 23, 42, 0.08),
-              0 4px 10px rgba(15, 23, 42, 0.04);
-$shadow-xl:   0 24px 48px rgba(15, 23, 42, 0.10),
-              0 8px 16px rgba(15, 23, 42, 0.05);
-$shadow-primary: 0 6px 20px rgba(59, 130, 246, 0.20);
-$shadow-critical: 0 6px 20px rgba(225, 29, 72, 0.20);
+// ---------- 阴影（新拟物核心：固定左上光源的双重阴影）----------
+// 暗 #b8bcc2 永远在 +X/+Y（右下），亮 #ffffff 永远在 -X/-Y（左上）
+$shadow-xs:   2px 2px 4px #b8bcc2, -2px -2px 4px #ffffff;
+$shadow-sm:   4px 4px 8px #b8bcc2, -4px -4px 8px #ffffff;
+$shadow-md:   6px 6px 12px #b8bcc2, -6px -6px 12px #ffffff;
+$shadow-lg:   8px 8px 16px #b8bcc2, -8px -8px 16px #ffffff;
+$shadow-xl:   12px 12px 24px #b8bcc2, -12px -12px 24px #ffffff;
 
-// ---------- 动效 ----------
-// 全部使用自定义缓动，禁用 linear 与浏览器默认 ease
-$ease-out:    cubic-bezier(0.16, 1, 0.3, 1);       // 元素进入：快进慢出
-$ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);      // 状态切换
-$ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   // 强调：轻微回弹
+// 凹陷（inset）：输入框 / 激活态
+$shadow-inset-sm:   inset 2px 2px 4px #b8bcc2, inset -2px -2px 4px #ffffff;
+$shadow-inset-md:   inset 4px 4px 8px #b8bcc2, inset -4px -4px 8px #ffffff;
+$shadow-inset-lg:   inset 6px 6px 12px #b8bcc2, inset -6px -6px 12px #ffffff;
+$shadow-inset-xl:   inset 8px 8px 16px #b8bcc2, inset -8px -8px 16px #ffffff;
 
-$dur-instant: 120ms;
+// 强调色阴影（主按钮等）：底色是强调色时用强调色投影，仍守光源方向
+$shadow-primary:   6px 6px 14px rgba(109, 93, 252, 0.38), -4px -4px 10px #ffffff;
+$shadow-critical:  6px 6px 14px rgba(214, 69, 98, 0.35), -4px -4px 10px #ffffff;
+
+// ---------- 动效（Smooth Molding：软塑料般的 300ms ease-in-out）----------
+$ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+$ease-in-out: ease-in-out;                          // 新拟物规定 ease-in-out
+$ease-spring: ease-in-out;                          // 禁用回弹曲线
+
+$dur-instant: 150ms;
 $dur-fast:    200ms;
-$dur-normal:  280ms;
-$dur-slow:    420ms;
-$dur-slower:  600ms;
+$dur-normal:  300ms;
+$dur-slow:    300ms;
+$dur-slower:  300ms;
 
-// ---------- 布局 ----------
+// ---------- 布局（不变）----------
 $sidebar-width:          232px;
 $sidebar-width-collapsed: 72px;
 $topbar-height:          64px;

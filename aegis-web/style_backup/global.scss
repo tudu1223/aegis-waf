@@ -29,11 +29,37 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-// 页面画布：新拟物派 —— 单一浅灰粘土表面，无渐变无网格
+// 页面画布：柔和的渐变 + 极淡的网格，营造精密感而不喧宾夺主
 .app-canvas {
   position: relative;
   min-height: 100%;
-  background: $bg-canvas;
+  background: $grad-canvas;
+
+  // 精密网格：仅在顶部区域可见，向下渐隐
+  &::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgba(59, 130, 246, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59, 130, 246, 0.035) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 20%, transparent 70%);
+  }
+
+  // 顶部光晕：引导视线，避免大面积平铺的单调
+  &::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(ellipse 70% 40% at 50% -5%,
+                rgba(99, 102, 241, 0.07) 0%, transparent 65%);
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -93,21 +119,24 @@ code, pre, .mono {
 }
 
 // ============================================================
-// 通用组件样式（Neumorphism）
+// 通用组件样式
 // ============================================================
 
-// ---------- 卡片面板：与背景同色的凸起表面 ----------
+// ---------- 卡片面板 ----------
 .panel {
   position: relative;
-  background: $bg-surface;
-  border: none;
+  background: $grad-surface;
+  border: 1px solid $border-subtle;
   border-radius: $r-lg;
-  box-shadow: $shadow-lg;
-  transition: box-shadow $dur-normal $ease-in-out;
+  box-shadow: $shadow-sm;
+  transition: box-shadow $dur-normal $ease-out,
+              transform $dur-normal $ease-out,
+              border-color $dur-normal $ease-out;
 
   &.is-interactive:hover {
-    // Hover Shadowing：手指靠近遮光，阴影缩小（禁止增大、禁止位移）
     box-shadow: $shadow-md;
+    transform: translateY(-2px);
+    border-color: $border-default;
   }
 
   &__header {
@@ -116,7 +145,7 @@ code, pre, .mono {
     justify-content: space-between;
     gap: $sp-3;
     padding: $sp-4 $sp-5;
-    border-bottom: 1px solid rgba(184, 188, 194, 0.35);
+    border-bottom: 1px solid $border-subtle;
   }
 
   &__title-group {
@@ -126,12 +155,12 @@ code, pre, .mono {
     min-width: 0;
   }
 
-  // 标题左侧的主色标识条（保留结构，改实底新拟物色）
+  // 标题左侧的主色标识条
   &__accent {
     width: 3px;
     height: 18px;
     border-radius: $r-full;
-    background: $primary-500;
+    background: $grad-primary;
     flex-shrink: 0;
   }
 
@@ -161,7 +190,7 @@ code, pre, .mono {
   }
 }
 
-// ---------- 徽标：同色系浅底 + 语义色文字（去边框）----------
+// ---------- 徽标 ----------
 .badge {
   display: inline-flex;
   align-items: center;
@@ -170,20 +199,20 @@ code, pre, .mono {
   font-size: $fs-micro;
   font-weight: $fw-semibold;
   border-radius: $r-full;
-  border: none;
+  border: 1px solid transparent;
   white-space: nowrap;
   line-height: 1.6;
 
-  &--critical { color: $critical; background: $critical-bg; }
-  &--high     { color: $high;     background: $high-bg; }
-  &--medium   { color: $medium;   background: $medium-bg; }
-  &--low      { color: $low;      background: $low-bg; }
-  &--safe     { color: $safe;     background: $safe-bg; }
-  &--info     { color: $info;     background: $info-bg; }
-  &--neutral  { color: $text-secondary; background: $bg-muted; }
+  &--critical { color: $critical; background: $critical-bg; border-color: $critical-border; }
+  &--high     { color: $high;     background: $high-bg;     border-color: $high-border; }
+  &--medium   { color: $medium;   background: $medium-bg;   border-color: $medium-border; }
+  &--low      { color: $low;      background: $low-bg;      border-color: $low-border; }
+  &--safe     { color: $safe;     background: $safe-bg;     border-color: $safe-border; }
+  &--info     { color: $info;     background: $info-bg;     border-color: $info-border; }
+  &--neutral  { color: $text-secondary; background: $bg-subtle; border-color: $border-default; }
 }
 
-// ---------- 按钮：新拟物凸起 → hover 缩影 → active 凹陷 ----------
+// ---------- 按钮 ----------
 .btn {
   display: inline-flex;
   align-items: center;
@@ -192,42 +221,35 @@ code, pre, .mono {
   padding: $sp-2 $sp-4;
   font-size: $fs-small;
   font-weight: $fw-medium;
-  border-radius: $r-md;
-  border: none;
-  transition: all $dur-fast $ease-in-out;
+  border-radius: $r-sm;
+  border: 1px solid transparent;
+  transition: all $dur-fast $ease-out;
   white-space: nowrap;
 
-  // 按下物理反馈：Extrude to Intrude（禁止 translate 位移）
+  // 按下时的物理反馈
   &:active:not(:disabled) {
-    box-shadow: $shadow-inset-sm;
+    transform: scale(0.97);
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    box-shadow: $shadow-xs;
   }
 
   &--primary {
-    background: $primary-500;
+    background: $grad-primary;
     color: $text-inverse;
-    box-shadow: $shadow-primary;
-    &:hover:not(:disabled) {
-      // 强调按钮 hover：彩色投影缩小（手指靠近遮光）
-      box-shadow: 3px 3px 8px rgba(109, 93, 252, 0.32), -2px -2px 6px #ffffff;
-    }
-    &:active:not(:disabled) {
-      box-shadow: inset 3px 3px 6px rgba(74, 61, 196, 0.55), inset -2px -2px 6px rgba(255, 255, 255, 0.35);
-    }
+    box-shadow: $shadow-xs;
+    &:hover:not(:disabled) { box-shadow: $shadow-primary; }
   }
 
   &--secondary {
     background: $bg-surface;
     color: $text-secondary;
-    box-shadow: $shadow-sm;
+    border-color: $border-default;
     &:hover:not(:disabled) {
-      // Hover Shadowing：阴影缩小而非增大
-      box-shadow: $shadow-xs;
+      background: $bg-hover;
+      border-color: $border-strong;
       color: $text-primary;
     }
   }
@@ -235,38 +257,26 @@ code, pre, .mono {
   &--ghost {
     background: transparent;
     color: $text-secondary;
-    box-shadow: none;
-    &:hover:not(:disabled) {
-      background: $bg-hover;
-      color: $text-primary;
-      box-shadow: $shadow-xs;
-    }
+    &:hover:not(:disabled) { background: $bg-hover; color: $text-primary; }
   }
 
   &--danger {
-    background: $critical;
+    background: $grad-critical;
     color: $text-inverse;
-    box-shadow: $shadow-critical;
-    &:hover:not(:disabled) {
-      box-shadow: 3px 3px 8px rgba(214, 69, 98, 0.3), -2px -2px 6px #ffffff;
-    }
-    &:active:not(:disabled) {
-      box-shadow: inset 3px 3px 6px rgba(160, 40, 66, 0.55), inset -2px -2px 6px rgba(255, 255, 255, 0.3);
-    }
+    &:hover:not(:disabled) { box-shadow: $shadow-critical; }
   }
 
   &--sm { padding: $sp-1 $sp-3; font-size: $fs-micro; }
 }
 
-// ---------- 分段控制器（防护模式切换）：凹槽轨道 + 凸起激活块 ----------
+// ---------- 分段控制器（防护模式切换）----------
 .segmented {
   display: inline-flex;
-  padding: 4px;
-  background: $bg-canvas;
-  border: none;
+  padding: 3px;
+  background: $bg-subtle;
+  border: 1px solid $border-subtle;
   border-radius: $r-md;
   gap: 2px;
-  box-shadow: $shadow-inset-md;
 
   &__item {
     position: relative;
@@ -275,14 +285,14 @@ code, pre, .mono {
     font-weight: $fw-medium;
     color: $text-secondary;
     border-radius: $r-sm;
-    transition: all $dur-fast $ease-in-out;
+    transition: all $dur-fast $ease-out;
 
     &:hover:not(.is-active) { color: $text-primary; }
 
     &.is-active {
       background: $bg-surface;
       color: $primary-600;
-      box-shadow: $shadow-sm;
+      box-shadow: $shadow-xs;
       font-weight: $fw-semibold;
     }
 
@@ -375,7 +385,7 @@ code, pre, .mono {
   100% { background-position: 0 50%; }
 }
 
-// ---------- 数据表格：去边框，行分隔用极淡阴影色 ----------
+// ---------- 数据表格 ----------
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -390,12 +400,12 @@ code, pre, .mono {
     text-transform: uppercase;
     letter-spacing: 0.06em;
     background: $bg-subtle;
-    border-bottom: 1px solid rgba(184, 188, 194, 0.35);
+    border-bottom: 1px solid $border-subtle;
     white-space: nowrap;
   }
 
   tbody tr {
-    border-bottom: 1px solid rgba(184, 188, 194, 0.22);
+    border-bottom: 1px solid $border-subtle;
     transition: background $dur-instant;
     &:hover { background: $bg-hover; }
     &:last-child { border-bottom: none; }
@@ -405,69 +415,6 @@ code, pre, .mono {
     padding: $sp-3 $sp-4;
     color: $text-secondary;
     vertical-align: middle;
-  }
-}
-
-// ---------- 表单元素（Neumorphism 通道）：全局兜底 ----------
-// 凹陷通道；focus 时内阴影收缩（通道开放），禁止加深
-input[type="text"],
-input[type="search"],
-input[type="number"],
-input[type="password"],
-input:not([type]),
-textarea,
-select {
-  background: $bg-canvas;
-  border: none;
-  border-radius: $r-md;
-  color: $text-primary;
-  box-shadow: $shadow-inset-md;
-  transition: box-shadow $dur-fast $ease-in-out;
-
-  &::placeholder { color: $text-tertiary; }
-
-  &:focus {
-    outline: none;
-    // Focus：内阴影深度减小（惰性收缩，非增强）
-    box-shadow: $shadow-inset-sm;
-  }
-
-  &:disabled { opacity: 0.5; }
-}
-
-select {
-  cursor: pointer;
-}
-
-// range 滑块：凹槽轨道（webkit）
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-  height: 24px;
-
-  &::-webkit-slider-runnable-track {
-    height: 8px;
-    border-radius: $r-full;
-    background: $bg-canvas;
-    box-shadow: $shadow-inset-sm;
-  }
-
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    margin-top: -6px;
-    border-radius: $r-full;
-    background: $bg-surface;
-    box-shadow: 3px 3px 6px #b8bcc2, -3px -3px 6px #ffffff;
-    border: none;
-    transition: box-shadow $dur-fast $ease-in-out;
-  }
-
-  &:active::-webkit-slider-thumb {
-    box-shadow: inset 2px 2px 4px #b8bcc2, inset -2px -2px 4px #ffffff;
   }
 }
 

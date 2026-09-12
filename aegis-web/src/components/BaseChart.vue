@@ -43,7 +43,7 @@ watch(() => props.option, () => render(), { deep: true })
 watch(() => props.loading, (v) => {
   if (!chart) return
   v ? chart.showLoading('default', {
-    text: '', color: '#3B82F6', maskColor: 'rgba(255,255,255,0.6)'
+    text: '', color: '#6d5dfc', maskColor: 'rgba(224,229,236,0.6)'
   }) : chart.hideLoading()
 })
 

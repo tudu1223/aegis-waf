@@ -287,7 +287,7 @@ const severityCls = (severity) => ({
     width: 17px;
     height: 17px;
     border-radius: $r-full;
-    background: #fff;
+    background: #e6eaf0;
     border: 2px solid $primary-500;
     box-shadow: $shadow-sm;
     cursor: pointer;
@@ -300,7 +300,7 @@ const severityCls = (severity) => ({
     width: 17px;
     height: 17px;
     border-radius: $r-full;
-    background: #fff;
+    background: #e6eaf0;
     border: 2px solid $primary-500;
     box-shadow: $shadow-sm;
     cursor: pointer;
@@ -431,7 +431,7 @@ const severityCls = (severity) => ({
     width: 17px;
     height: 17px;
     border-radius: $r-full;
-    background: #fff;
+    background: #e6eaf0;
     box-shadow: $shadow-xs;
     transition: transform $dur-normal $ease-spring;
   }

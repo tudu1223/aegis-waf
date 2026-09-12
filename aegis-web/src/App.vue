@@ -65,8 +65,8 @@ onUnmounted(() => {
                   stroke-linecap="round" stroke-linejoin="round" />
             <defs>
               <linearGradient id="shield" x1="4" y1="2" x2="28" y2="31" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#3B82F6" />
-                <stop offset="1" stop-color="#6366F1" />
+                <stop stop-color="#6d5dfc" />
+                <stop offset="1" stop-color="#6d5dfc" />
               </linearGradient>
             </defs>
           </svg>
@@ -160,9 +160,9 @@ onUnmounted(() => {
   flex-direction: column;
   width: $sidebar-width;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(16px) saturate(1.4);
-  border-right: 1px solid $border-subtle;
+  background: $bg-canvas;
+  border-right: none;
+  box-shadow: 6px 0 14px rgba(184, 188, 194, 0.42), -2px 0 6px #ffffff;
   transition: width $dur-normal $ease-out;
 
   .is-collapsed & { width: $sidebar-width-collapsed; }
@@ -173,7 +173,7 @@ onUnmounted(() => {
     gap: $sp-3;
     height: $topbar-height;
     padding: 0 $sp-4;
-    border-bottom: 1px solid $border-subtle;
+    border-bottom: 1px solid rgba(184, 188, 194, 0.35);
     overflow: hidden;
   }
 
@@ -188,7 +188,7 @@ onUnmounted(() => {
 
   &__footer {
     padding: $sp-3;
-    border-top: 1px solid $border-subtle;
+    border-top: 1px solid rgba(184, 188, 194, 0.35);
     display: flex;
     justify-content: flex-end;
   }
@@ -234,8 +234,9 @@ onUnmounted(() => {
   }
 
   &.is-active {
-    background: $primary-50;
+    background: $bg-canvas;
     color: $primary-600;
+    box-shadow: $shadow-inset-sm;
     .nav-item__indicator { transform: scaleY(1); }
     .nav-item__icon { color: $primary-600; }
   }
@@ -322,9 +323,9 @@ onUnmounted(() => {
   gap: $sp-4;
   height: $topbar-height;
   padding: 0 $sp-6;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(16px) saturate(1.4);
-  border-bottom: 1px solid $border-subtle;
+  background: $bg-canvas;
+  border-bottom: none;
+  box-shadow: 0 6px 14px rgba(184, 188, 194, 0.4), 0 -2px 6px #ffffff;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -376,8 +377,9 @@ onUnmounted(() => {
   gap: $sp-2;
   padding: $sp-1 $sp-3;
   border-radius: $r-full;
-  background: $bg-subtle;
-  border: 1px solid $border-subtle;
+  background: $bg-canvas;
+  border: none;
+  box-shadow: $shadow-inset-sm;
 
   &__text {
     font-size: $fs-micro;

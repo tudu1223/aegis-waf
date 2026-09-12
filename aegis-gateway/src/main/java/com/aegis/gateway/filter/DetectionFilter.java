@@ -82,7 +82,9 @@ public class DetectionFilter implements Filter {
         HttpServletResponse response = (HttpServletResponse) res;
 
         String uri = request.getRequestURI();
-        if (shouldSkip(uri)) {
+        if (shouldSkip(uri) || "OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            // OPTIONS 为跨源预检（见 ReverseProxyServlet#applyCorsHeaders），
+            // 不参与检测与限流统计
             chain.doFilter(req, res);
             return;
         }
@@ -288,6 +290,10 @@ public class DetectionFilter implements Filter {
         response.setContentType("application/json; charset=utf-8");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setHeader("X-Aegis-Blocked", "1");
+        // 演示页托管在靶场 8090，跨源读取拦截结果依赖以下头；
+        // 若缺失，浏览器会吞掉整个 403 响应体，前端无法展示判定依据
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Expose-Headers", "X-Aegis-Blocked, X-Aegis-Trace");
         String json = MAPPER.writeValueAsString(Map.of(
                 "success", false,
                 "blocked", true,

@@ -239,7 +239,7 @@ function goPage(delta) {
                   {{ event.riskScore ?? 0 }}
                 </b>
               </td>
-              <td class="mono-num" style="color:#94A3B8">
+              <td class="mono-num" style="color:#9AA3B0">
                 {{ event.detectionCostMicros
                    ? (event.detectionCostMicros / 1000).toFixed(2) + 'ms' : '—' }}
               </td>

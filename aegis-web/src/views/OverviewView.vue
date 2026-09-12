@@ -44,34 +44,34 @@ const timelineOption = computed(() => {
     grid: { left: 8, right: 12, top: 28, bottom: 4, containLabel: true },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(255,255,255,0.96)',
-      borderColor: '#E2E8F0',
+      backgroundColor: 'rgba(240,242,246,0.96)',
+      borderColor: '#C6CCD6',
       borderWidth: 1,
       padding: [8, 12],
-      textStyle: { color: '#0F172A', fontSize: 12 },
+      textStyle: { color: '#333333', fontSize: 12 },
       extraCssText: 'box-shadow:0 8px 24px rgba(15,23,42,.10);border-radius:10px;',
-      axisPointer: { type: 'line', lineStyle: { color: '#CBD5E1', type: 'dashed' } }
+      axisPointer: { type: 'line', lineStyle: { color: '#B8BEC9', type: 'dashed' } }
     },
     legend: {
       data: ['检测事件', '已拦截'],
       right: 0, top: 0,
       itemWidth: 10, itemHeight: 10, itemGap: 16,
-      textStyle: { color: '#475569', fontSize: 11 },
+      textStyle: { color: '#6b7280', fontSize: 11 },
       icon: 'roundRect'
     },
     xAxis: {
       type: 'category',
       data: labels,
       boundaryGap: false,
-      axisLine: { lineStyle: { color: '#E2E8F0' } },
+      axisLine: { lineStyle: { color: '#C6CCD6' } },
       axisTick: { show: false },
-      axisLabel: { color: '#94A3B8', fontSize: 10, interval: 'auto' }
+      axisLabel: { color: '#9AA3B0', fontSize: 10, interval: 'auto' }
     },
     yAxis: {
       type: 'value',
       minInterval: 1,
-      splitLine: { lineStyle: { color: '#EDF1F7', type: 'dashed' } },
-      axisLabel: { color: '#94A3B8', fontSize: 10 }
+      splitLine: { lineStyle: { color: '#D4D9E1', type: 'dashed' } },
+      axisLabel: { color: '#9AA3B0', fontSize: 10 }
     },
     series: [
       {
@@ -79,7 +79,7 @@ const timelineOption = computed(() => {
         type: 'line',
         smooth: 0.4,
         symbol: 'none',
-        lineStyle: { width: 2, color: '#3B82F6' },
+        lineStyle: { width: 2, color: '#6d5dfc' },
         areaStyle: {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
@@ -112,8 +112,8 @@ const timelineOption = computed(() => {
 })
 
 // ==================== 威胁类型分布 ====================
-const PALETTE = ['#3B82F6', '#E11D48', '#EA580C', '#D97706', '#059669',
-                 '#4F46E5', '#0891B2', '#7C3AED']
+const PALETTE = ['#6d5dfc', '#E11D48', '#EA580C', '#D97706', '#059669',
+                 '#7A6EE0', '#0891B2', '#7C3AED']
 
 const distributionOption = computed(() => {
   const data = store.threatDistribution
@@ -123,9 +123,9 @@ const distributionOption = computed(() => {
   return {
     tooltip: {
       trigger: 'item',
-      backgroundColor: 'rgba(255,255,255,0.96)',
-      borderColor: '#E2E8F0',
-      textStyle: { color: '#0F172A', fontSize: 12 },
+      backgroundColor: 'rgba(240,242,246,0.96)',
+      borderColor: '#C6CCD6',
+      textStyle: { color: '#333333', fontSize: 12 },
       extraCssText: 'box-shadow:0 8px 24px rgba(15,23,42,.10);border-radius:10px;',
       formatter: '{b}<br/>数量 {c} · 占比 {d}%'
     },
@@ -133,7 +133,7 @@ const distributionOption = computed(() => {
       orient: 'vertical',
       right: 4, top: 'center',
       itemWidth: 9, itemHeight: 9, itemGap: 10,
-      textStyle: { color: '#475569', fontSize: 11 },
+      textStyle: { color: '#6b7280', fontSize: 11 },
       icon: 'circle'
     },
     series: [{
@@ -141,7 +141,7 @@ const distributionOption = computed(() => {
       radius: ['46%', '72%'],
       center: ['34%', '50%'],
       avoidLabelOverlap: true,
-      itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
+      itemStyle: { borderRadius: 5, borderColor: '#e0e5ec', borderWidth: 2 },
       label: { show: false },
       labelLine: { show: false },
       emphasis: {
@@ -165,9 +165,9 @@ const attackerOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
-      backgroundColor: 'rgba(255,255,255,0.96)',
-      borderColor: '#E2E8F0',
-      textStyle: { color: '#0F172A', fontSize: 12 },
+      backgroundColor: 'rgba(240,242,246,0.96)',
+      borderColor: '#C6CCD6',
+      textStyle: { color: '#333333', fontSize: 12 },
       extraCssText: 'box-shadow:0 8px 24px rgba(15,23,42,.10);border-radius:10px;'
     },
     xAxis: { type: 'value', show: false },
@@ -177,7 +177,7 @@ const attackerOption = computed(() => {
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: {
-        color: '#475569', fontSize: 11,
+        color: '#6b7280', fontSize: 11,
         fontFamily: 'JetBrains Mono, monospace'
       }
     },
@@ -190,13 +190,13 @@ const attackerOption = computed(() => {
           type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
             { offset: 0, color: 'rgba(59,130,246,0.35)' },
-            { offset: 1, color: '#3B82F6' }
+            { offset: 1, color: '#6d5dfc' }
           ]
         }
       },
       label: {
         show: true, position: 'right',
-        color: '#475569', fontSize: 11,
+        color: '#6b7280', fontSize: 11,
         fontFamily: 'JetBrains Mono, monospace'
       },
       data: data.map((d) => d.count)
@@ -261,7 +261,7 @@ const modeClass = computed(() => ({
         <div class="gauge-panel__inner">
           <ThreatGauge
             :value="store.overview.interceptRate"
-            :color="store.policy.mode === 'OFF' ? '#94A3B8' : '#059669'"
+            :color="store.policy.mode === 'OFF' ? '#9AA3B0' : '#059669'"
             label="拦截率" :sublabel="modeLabel"
           />
           <div class="gauge-panel__meta">

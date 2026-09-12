@@ -20,7 +20,37 @@ import java.util.List;
  */
 public final class CommandGuard {
 
+    /** 反射桥接用的入口缓存：内联进 ProcessBuilder 的 Advice 无状态，
+     *  经 Class.forName 定位本类后调用此方法，缓存由本类静态字段持有。 */
+    private static volatile java.lang.reflect.Method selfMethod;
+
     private CommandGuard() {
+    }
+
+    /**
+     * 反射桥接入口。
+     *
+     * <p>{@code ProcessBuilder} 由引导类加载器加载，内联进其 {@code start()}
+     * 的检测代码无法直接引用本类（系统类加载器），因此经反射调用。
+     * 本方法缓存自身的 Method 对象，将反射查找开销降为一次。
+     *
+     * @param command 命令及参数列表
+     */
+    public static void bridgeInspect(List<String> command) {
+        try {
+            java.lang.reflect.Method m = selfMethod;
+            if (m == null) {
+                m = CommandGuard.class.getDeclaredMethod("inspect", List.class);
+                selfMethod = m;
+            }
+            m.invoke(null, command);
+        } catch (Throwable t) {
+            Throwable cause = t.getCause() != null ? t.getCause() : t;
+            if (cause instanceof SecurityException) {
+                throw (SecurityException) cause;
+            }
+            // 桥接异常：失败安全，放行
+        }
     }
 
     /**

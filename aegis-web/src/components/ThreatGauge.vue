@@ -12,7 +12,7 @@ const props = defineProps({
   value: { type: Number, default: 0 },
   label: { type: String, default: '拦截率' },
   sublabel: { type: String, default: '' },
-  color: { type: String, default: '#3B82F6' },
+  color: { type: String, default: '#6d5dfc' },
   size: { type: Number, default: 176 }
 })
 
@@ -95,7 +95,7 @@ const displayValue = computed(() => animated.value.toFixed(1))
           v-for="(tick, index) in ticks"
           :key="index"
           :x1="tick.x1" :y1="tick.y1" :x2="tick.x2" :y2="tick.y2"
-          :stroke="tick.active ? color : '#E2E8F0'"
+          :stroke="tick.active ? color : '#C6CCD6'"
           :stroke-width="tick.major ? 1.6 : 1"
           :opacity="tick.active ? 0.85 : 0.5"
           stroke-linecap="round"
@@ -105,7 +105,7 @@ const displayValue = computed(() => animated.value.toFixed(1))
       <!-- 进度轨道 -->
       <circle
         cx="88" cy="88" :r="RADIUS"
-        fill="none" stroke="#EDF1F7" stroke-width="9"
+        fill="none" stroke="#D4D9E1" stroke-width="9"
         :stroke-dasharray="dashArray"
         stroke-linecap="round"
         transform="rotate(135 88 88)"

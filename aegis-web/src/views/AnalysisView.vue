@@ -680,9 +680,9 @@ function selectEvent(id) {
   white-space: pre-wrap;
   word-break: break-word;
 
-  :deep(.sql-keyword) { color: #2563EB; font-weight: 600; }
+  :deep(.sql-keyword) { color: #5b4be0; font-weight: 600; }
   :deep(.sql-string)  { color: #059669; }
-  :deep(.sql-comment) { color: #94A3B8; font-style: italic; }
+  :deep(.sql-comment) { color: #9AA3B0; font-style: italic; }
   :deep(.sql-danger)  {
     color: #E11D48;
     font-weight: 700;
